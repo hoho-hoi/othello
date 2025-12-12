@@ -2,16 +2,14 @@
 
 
 ## Current Status
-- **Phase:** Phase 0 (Requirements)  <!-- e.g., Phase 1 (Setup), Phase 2 (Implementation) -->
+- **Phase:** Phase 1 (Setup)  <!-- e.g., Phase 1 (Setup), Phase 2 (Implementation) -->
 - **Active Issues:**
-  - #1 Project Setup
-  - #2 ...
+  - #2 [SETUP] Webアプリ基盤（Vite+React+TS）/ Lint・Format・Test・CI 整備
 
 ## Milestones
 
 ### v0.1 (MVP)
-- [ ] Issue #1: Project Setup (Tech Stack Definition)
-- [ ] Issue #2: ...
+- [ ] Issue #2: [SETUP] Webアプリ基盤（Vite+React+TS）/ Lint・Format・Test・CI 整備
 <!-- When v0.1 is fully checked, the Manager must run a meta-review (see project-admin.mdc). -->
 
 ### Backlog (Refactoring & Future)
