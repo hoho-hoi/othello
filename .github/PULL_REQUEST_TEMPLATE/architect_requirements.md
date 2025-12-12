@@ -1,3 +1,35 @@
+## Summary
+
+- What changed:
+- Why:
+
+## Docs Updated
+
+- [ ] `docs/REQUIREMENT.md`
+- [ ] `docs/USE_CASES.md`
+- [ ] `docs/DOMAIN_ER.md`
+- [ ] `docs/INTERACTION_FLOW.md`
+- [ ] `docs/ARCHITECTURE_DIAGRAM.md`
+
+## Review Checklist (Manager)
+
+- **Completeness**:
+  - [ ] No `TBD` / blanks remain in `docs/` templates (or the reason is explicitly written).
+  - [ ] In-scope / out-of-scope are clearly separated.
+- **Traceability**:
+  - [ ] `REQUIREMENT.md` Operations (`OP_ID`) are referenced by `USE_CASES.md`.
+  - [ ] `USE_CASES.md` States reference `INTERACTION_FLOW.md` State IDs.
+  - [ ] `USE_CASES.md` Domain terms align with `DOMAIN_ER.md`.
+- **Consistency**:
+  - [ ] Interaction diagram, use cases, and architecture diagram do not contradict each other.
+  - [ ] Storage scopes (Ephemeral/DeviceLocal/etc.) are coherent across docs.
+- **Risk / Security**:
+  - [ ] Import/export surfaces include explicit validation & safe error handling assumptions.
+  - [ ] No online features are accidentally implied (offline-only).
+
+## Notes / Open Questions
+
+- None
 # 要件定義 / 設計ドキュメント 初版
 
 ## Self-Walkthrough（docs/ と要件の対応）
