@@ -19,7 +19,7 @@ import {
   importRecord,
   type AppState,
 } from './app/gameState'
-import { canPass } from './domain/rules'
+import { canPass, computeGameResult } from './domain/rules'
 import { Board } from './components/Board'
 import { RecordSidebar } from './components/RecordSidebar'
 
@@ -347,7 +347,7 @@ function App() {
   if (appState.type === 'RESULT') {
     const handleNewGameClick = () => {
       setStatusMessage(null)
-      // R1: STATE_RESULT から New Game 操作ができる
+      // R4: STATE_RESULT から New Game 操作ができる
       setAppState({
         type: 'NEW_GAME_CONFIRM',
         previousState: 'RESULT',
@@ -358,7 +358,7 @@ function App() {
 
     const handleExportClick = () => {
       setStatusMessage(null)
-      // R1: STATE_RESULT から Export 操作ができる
+      // R3: STATE_RESULT から Export 操作ができる
       setAppState({
         type: 'EXPORTING',
         originState: 'RESULT',
@@ -367,14 +367,39 @@ function App() {
       })
     }
 
+    // R1, R2: Compute game result (stone counts and winner)
+    const gameResult = computeGameResult(appState.gameState.board)
+    const winnerText =
+      gameResult.winner === null
+        ? 'Draw'
+        : gameResult.winner === 'BLACK'
+          ? 'Black wins'
+          : 'White wins'
+
     return (
-      <div>
+      <div className="app-result">
         <h1>Othello</h1>
         {statusMessageElement}
-        <p>Game finished.</p>
-        <div>
-          <button onClick={handleNewGameClick}>New Game</button>
-          <button onClick={handleExportClick}>Export</button>
+        <div className="result-container">
+          <h2>Game finished</h2>
+          {/* R1: Display stone counts */}
+          <div className="stone-counts">
+            <p>
+              Black: {gameResult.blackCount} White: {gameResult.whiteCount}
+            </p>
+          </div>
+          {/* R2: Display winner */}
+          <div className="winner">
+            <p>{winnerText}</p>
+          </div>
+          <div>
+            <button onClick={handleNewGameClick}>New Game</button>
+            <button onClick={handleExportClick}>Export</button>
+          </div>
+        </div>
+        {/* R5: Display RecordSidebar in RESULT state */}
+        <div className="game-container">
+          <RecordSidebar moves={appState.moves} />
         </div>
       </div>
     )
