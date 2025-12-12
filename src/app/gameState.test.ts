@@ -256,3 +256,47 @@ describe('placeStone', () => {
     expect(deviceLocalStorage.saveGameToDeviceLocal).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('startNewGame', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should create new game with empty moves and save to DeviceLocal', async () => {
+    const { startNewGame } = await import('./gameState')
+
+    vi.mocked(deviceLocalStorage.saveGameToDeviceLocal).mockReturnValue({
+      success: true,
+      data: undefined,
+    })
+
+    const result = await startNewGame()
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.gameState).toBeTruthy()
+      expect(result.gameState.board).toEqual(createInitialBoard())
+      expect(result.gameState.nextTurnColor).toBe('BLACK')
+      expect(result.gameState.isFinished).toBe(false)
+      expect(result.moves).toEqual([])
+    }
+    expect(deviceLocalStorage.saveGameToDeviceLocal).toHaveBeenCalledTimes(1)
+    expect(deviceLocalStorage.saveGameToDeviceLocal).toHaveBeenCalledWith([])
+  })
+
+  it('should return error when DeviceLocal save fails', async () => {
+    const { startNewGame } = await import('./gameState')
+
+    vi.mocked(deviceLocalStorage.saveGameToDeviceLocal).mockReturnValue({
+      success: false,
+      error: 'Storage quota exceeded',
+    })
+
+    const result = await startNewGame()
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Storage quota exceeded')
+    }
+  })
+})
