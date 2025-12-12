@@ -828,4 +828,240 @@ describe('App', () => {
       )
     })
   })
+
+  describe('Import functionality', () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+    })
+
+    const setupPreview = () => {
+      const previewMoves = [
+        {
+          moveNumber: 1,
+          color: 'BLACK' as const,
+          row: 2 as const,
+          col: 3 as const,
+          isPass: false,
+        },
+      ]
+      const previewGameState = {
+        board: createInitialBoard(),
+        nextTurnColor: 'WHITE' as const,
+        isFinished: false,
+      }
+      return { previewMoves, previewGameState }
+    }
+
+    it('shows import confirmation dialog when preview succeeds', async () => {
+      const user = userEvent.setup()
+      const { previewMoves, previewGameState } = setupPreview()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: previewGameState,
+        moves: [],
+      })
+
+      vi.mocked(gameState.prepareImportRecordFromClipboard).mockResolvedValue({
+        success: true,
+        preview: {
+          moves: previewMoves,
+          previewGameState,
+          recordSizeBytes: 128,
+        },
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      const importButton = screen.getByRole('button', {
+        name: /import/i,
+      })
+      await user.click(importButton)
+
+      expect(gameState.prepareImportRecordFromClipboard).toHaveBeenCalledTimes(
+        1
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText(/Import Record/i)).toBeInTheDocument()
+        expect(screen.getByText(/Moves:/i)).toBeInTheDocument()
+      })
+    })
+
+    it('cancels import confirmation and restores playing state', async () => {
+      const user = userEvent.setup()
+      const { previewMoves, previewGameState } = setupPreview()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: previewGameState,
+        moves: [],
+      })
+
+      vi.mocked(gameState.prepareImportRecordFromClipboard).mockResolvedValue({
+        success: true,
+        preview: {
+          moves: previewMoves,
+          previewGameState,
+          recordSizeBytes: 128,
+        },
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      const importButton = screen.getByRole('button', {
+        name: /import/i,
+      })
+      await user.click(importButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/Import Record/i)).toBeInTheDocument()
+      })
+
+      const cancelButton = screen.getByRole('button', { name: /cancel/i })
+      await user.click(cancelButton)
+
+      expect(screen.getByTestId('board')).toBeInTheDocument()
+      expect(screen.queryByText(/Import Record/i)).not.toBeInTheDocument()
+    })
+
+    it('displays error when preview fails and stays in playing state', async () => {
+      const user = userEvent.setup()
+      const previewGameState = {
+        board: createInitialBoard(),
+        nextTurnColor: 'BLACK' as const,
+        isFinished: false,
+      }
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: previewGameState,
+        moves: [],
+      })
+
+      vi.mocked(gameState.prepareImportRecordFromClipboard).mockResolvedValue({
+        success: false,
+        error: 'Invalid clipboard JSON',
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      const importButton = screen.getByRole('button', {
+        name: /import/i,
+      })
+      await user.click(importButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/Invalid clipboard JSON/i)).toBeInTheDocument()
+      })
+      expect(screen.getByTestId('board')).toBeInTheDocument()
+    })
+
+    it('imports record successfully when confirmed', async () => {
+      const user = userEvent.setup()
+      const { previewMoves, previewGameState } = setupPreview()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: previewGameState,
+        moves: [],
+      })
+
+      vi.mocked(gameState.prepareImportRecordFromClipboard).mockResolvedValue({
+        success: true,
+        preview: {
+          moves: previewMoves,
+          previewGameState,
+          recordSizeBytes: 128,
+        },
+      })
+
+      vi.mocked(gameState.importRecord).mockResolvedValue({
+        success: true,
+        gameState: previewGameState,
+        moves: previewMoves,
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      const importButton = screen.getByRole('button', {
+        name: /import/i,
+      })
+      await user.click(importButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/Import Record/i)).toBeInTheDocument()
+      })
+
+      const confirmButton = screen.getByRole('button', { name: /confirm/i })
+      await user.click(confirmButton)
+
+      await waitFor(() => {
+        expect(gameState.importRecord).toHaveBeenCalledTimes(1)
+        expect(
+          screen.getByText(/Record imported successfully/i)
+        ).toBeInTheDocument()
+        expect(screen.getByTestId('board')).toBeInTheDocument()
+      })
+    })
+
+    it('shows error when import save fails and reverts to playing state', async () => {
+      const user = userEvent.setup()
+      const { previewMoves, previewGameState } = setupPreview()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: previewGameState,
+        moves: [],
+      })
+
+      vi.mocked(gameState.prepareImportRecordFromClipboard).mockResolvedValue({
+        success: true,
+        preview: {
+          moves: previewMoves,
+          previewGameState,
+          recordSizeBytes: 128,
+        },
+      })
+
+      vi.mocked(gameState.importRecord).mockResolvedValue({
+        success: false,
+        error: 'Storage quota exceeded',
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      const importButton = screen.getByRole('button', {
+        name: /import/i,
+      })
+      await user.click(importButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/Import Record/i)).toBeInTheDocument()
+      })
+
+      const confirmButton = screen.getByRole('button', { name: /confirm/i })
+      await user.click(confirmButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/Storage quota exceeded/i)).toBeInTheDocument()
+        expect(screen.getByTestId('board')).toBeInTheDocument()
+      })
+    })
+  })
 })

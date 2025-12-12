@@ -18,6 +18,7 @@ import {
 } from './recordFormat'
 
 const STORAGE_KEY = 'othello_current_game'
+export const MAX_RECORD_JSON_SIZE = 1024 * 1024
 
 /**
  * Storage operation result
@@ -53,11 +54,10 @@ export function saveGameToDeviceLocal(
     const json = serializeRecordFormat(record)
 
     // Check size limit (1 MiB as per REQUIREMENT.md)
-    const MAX_SIZE = 1024 * 1024
-    if (json.length > MAX_SIZE) {
+    if (json.length > MAX_RECORD_JSON_SIZE) {
       return {
         success: false,
-        error: `Record size exceeds limit: ${json.length} bytes > ${MAX_SIZE} bytes`,
+        error: `Record size exceeds limit: ${json.length} bytes > ${MAX_RECORD_JSON_SIZE} bytes`,
       }
     }
 

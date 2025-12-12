@@ -442,3 +442,179 @@ describe('exportRecordToFile', () => {
     }
   })
 })
+
+describe('prepareImportRecordFromClipboard', () => {
+  let readTextMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    readTextMock = vi.fn()
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      value: { readText: readTextMock },
+      configurable: true,
+      writable: true,
+    })
+  })
+
+  it('should prepare import preview for valid record', async () => {
+    const { prepareImportRecordFromClipboard } = await import('./gameState')
+    const moves: readonly Move[] = [
+      {
+        moveNumber: 1,
+        color: 'BLACK',
+        row: 2,
+        col: 3,
+        isPass: false,
+      },
+    ]
+    const clipboardText = JSON.stringify({
+      formatVersion: 1,
+      moves,
+    })
+    readTextMock.mockResolvedValue(clipboardText)
+
+    const result = await prepareImportRecordFromClipboard()
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.preview.moves).toEqual(moves)
+      expect(result.preview.previewGameState.nextTurnColor).toBe('WHITE')
+      expect(result.preview.recordSizeBytes).toBe(clipboardText.length)
+    }
+  })
+
+  it('should reject oversized clipboard payload', async () => {
+    const { prepareImportRecordFromClipboard } = await import('./gameState')
+    const oversized = 'a'.repeat(deviceLocalStorage.MAX_RECORD_JSON_SIZE + 1)
+    readTextMock.mockResolvedValue(oversized)
+
+    const result = await prepareImportRecordFromClipboard()
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Record size exceeds limit')
+    }
+  })
+
+  it('should reject invalid record schemas', async () => {
+    const { prepareImportRecordFromClipboard } = await import('./gameState')
+    const invalidRecord = JSON.stringify({
+      formatVersion: 2,
+      moves: [],
+    })
+    readTextMock.mockResolvedValue(invalidRecord)
+
+    const result = await prepareImportRecordFromClipboard()
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Record validation failed')
+    }
+  })
+
+  it('should reject rule validation failures', async () => {
+    const { prepareImportRecordFromClipboard } = await import('./gameState')
+    const moves: readonly Move[] = [
+      {
+        moveNumber: 1,
+        color: 'WHITE',
+        row: 2,
+        col: 3,
+        isPass: false,
+      },
+    ]
+    readTextMock.mockResolvedValue(
+      JSON.stringify({
+        formatVersion: 1,
+        moves,
+      })
+    )
+
+    const result = await prepareImportRecordFromClipboard()
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Rule validation failed')
+    }
+  })
+
+  it('should surface clipboard read errors', async () => {
+    const { prepareImportRecordFromClipboard } = await import('./gameState')
+    readTextMock.mockRejectedValue(new Error('Permission denied'))
+
+    const result = await prepareImportRecordFromClipboard()
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Clipboard read error')
+    }
+  })
+})
+
+describe('importRecord', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should save imported record and return success', async () => {
+    const { importRecord } = await import('./gameState')
+    const moves: readonly Move[] = [
+      {
+        moveNumber: 1,
+        color: 'BLACK',
+        row: 2,
+        col: 3,
+        isPass: false,
+      },
+    ]
+    const previewGameState = {
+      board: createInitialBoard(),
+      nextTurnColor: 'BLACK' as const,
+      isFinished: false,
+    }
+
+    vi.mocked(deviceLocalStorage.saveGameToDeviceLocal).mockReturnValue({
+      success: true,
+      data: undefined,
+    })
+
+    const result = await importRecord(moves, previewGameState)
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.gameState).toBe(previewGameState)
+      expect(result.moves).toBe(moves)
+    }
+    expect(deviceLocalStorage.saveGameToDeviceLocal).toHaveBeenCalledWith(moves)
+  })
+
+  it('should surface storage save errors', async () => {
+    const { importRecord } = await import('./gameState')
+    const moves: readonly Move[] = [
+      {
+        moveNumber: 1,
+        color: 'BLACK',
+        row: 2,
+        col: 3,
+        isPass: false,
+      },
+    ]
+    const previewGameState = {
+      board: createInitialBoard(),
+      nextTurnColor: 'BLACK' as const,
+      isFinished: false,
+    }
+
+    vi.mocked(deviceLocalStorage.saveGameToDeviceLocal).mockReturnValue({
+      success: false,
+      error: 'Quota exceeded',
+    })
+
+    const result = await importRecord(moves, previewGameState)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Failed to save imported record')
+    }
+  })
+})
