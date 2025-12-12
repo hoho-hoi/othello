@@ -273,7 +273,7 @@ export function computeGameResult(board: Board): GameResult {
  * Recompute board state from moves sequence
  * Starts from initial board and applies moves in order
  */
-export function recomputeBoardFromMoves(moves: Move[]): Board {
+export function recomputeBoardFromMoves(moves: readonly Move[]): Board {
   let board = createInitialBoard()
   let currentTurnColor: PieceColor = 'BLACK'
 
