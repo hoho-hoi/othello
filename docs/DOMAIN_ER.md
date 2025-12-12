@@ -23,15 +23,33 @@
 
 ```mermaid
 erDiagram
-  %% ここにプロジェクト固有のドメインエンティティと関係を記述する
-  %% 例:
-  %% USER ||--o{ SCORE : "ユーザは複数のスコアを持つ (1:N)"
-  %% USER {
-  %%   string id    PK   "storage_scope: UserPersistent / UUID"
-  %%   string name       "storage_scope: UserPersistent / 必須"
-  %% }
-  %% SCORE {
-  %%   string id     PK   "storage_scope: UserPersistent"
-  %%   string userId FK   "storage_scope: UserPersistent"
-  %%   int    value       "0以上 / storage_scope: UserPersistent"
-  %% }
+  %% Domain: "Current game only" Othello record management.
+  %%
+  %% Storage policy:
+  %% - All persisted entities are DeviceLocal (offline, no account).
+
+  GAME ||--o{ MOVE : "game has moves (1:N)"
+
+  GAME {
+    string id PK "storage_scope: DeviceLocal / UUID"
+    string status "storage_scope: DeviceLocal / IN_PROGRESS|FINISHED"
+    string nextTurnColor "storage_scope: DeviceLocal / BLACK|WHITE"
+    string startedAt "storage_scope: DeviceLocal / ISO-8601"
+    string updatedAt "storage_scope: DeviceLocal / ISO-8601"
+  }
+
+  MOVE {
+    string id PK "storage_scope: DeviceLocal / UUID"
+    string gameId FK "storage_scope: DeviceLocal"
+    int moveNumber "storage_scope: DeviceLocal / 1.."
+    int row "storage_scope: DeviceLocal / 0..7"
+    int col "storage_scope: DeviceLocal / 0..7"
+    string color "storage_scope: DeviceLocal / BLACK|WHITE"
+    boolean isPass "storage_scope: DeviceLocal"
+    string createdAt "storage_scope: DeviceLocal / ISO-8601"
+  }
+```
+
+Notes:
+- This ER focuses on "record" (moves) needed for import/export and restore.
+- Board state and legal moves are derivable from MOVE sequence + Othello rules (Ephemeral).

@@ -18,11 +18,31 @@ mermaid の flowchart で記述する (UML 状態マシン図の簡易版)。
 
 ```mermaid
 flowchart TD
-  %% ここにプロジェクト固有の状態遷移を記述する
-  %% 例:
-  %% STATE_TITLE     -->|start_button_clicked| STATE_IN_GAME
-  %% STATE_IN_GAME   -->|player_died|         STATE_RESULT
-  %% STATE_IN_GAME   -->|pause_button|        STATE_PAUSE
-  %% STATE_PAUSE     -->|resume_button|       STATE_IN_GAME
-  %% STATE_RESULT    -->|back_to_title|       STATE_TITLE
+  %% Othello: offline, single device, current game only.
+
+  STATE_LOADING["STATE_LOADING<br/>Load current game from DeviceLocal or create new game"] -->|app_opened| STATE_PLAYING
+
+  STATE_PLAYING["STATE_PLAYING<br/>Board + sidebar record"] -->|cell_tapped_valid| STATE_PLAYING
+  STATE_PLAYING -->|cell_tapped_invalid| STATE_PLAYING
+  STATE_PLAYING -->|no_legal_moves_for_current_turn| STATE_PLAYING
+  STATE_PLAYING -->|game_finished_by_rules| STATE_RESULT
+
+  STATE_PLAYING -->|import_clicked| STATE_IMPORT_CONFIRM
+  STATE_IMPORT_CONFIRM["STATE_IMPORT_CONFIRM<br/>Confirm overwrite current game"] -->|confirm| STATE_IMPORTING
+  STATE_IMPORT_CONFIRM -->|cancel| STATE_PLAYING
+
+  STATE_IMPORTING["STATE_IMPORTING<br/>Validate JSON + overwrite current game"] -->|import_succeeded| STATE_PLAYING
+  STATE_IMPORTING -->|import_failed| STATE_ERROR
+
+  STATE_PLAYING -->|export_clicked| STATE_EXPORTING
+  STATE_RESULT -->|export_clicked| STATE_EXPORTING
+  STATE_EXPORTING["STATE_EXPORTING<br/>Generate JSON + copy/download"] -->|export_succeeded| STATE_PLAYING
+  STATE_EXPORTING -->|export_failed| STATE_ERROR
+
+  STATE_PLAYING -->|new_game_clicked| STATE_NEW_GAME_CONFIRM
+  STATE_RESULT -->|new_game_clicked| STATE_NEW_GAME_CONFIRM
+  STATE_NEW_GAME_CONFIRM["STATE_NEW_GAME_CONFIRM<br/>Confirm abandon current game"] -->|confirm| STATE_PLAYING
+  STATE_NEW_GAME_CONFIRM -->|cancel| STATE_PLAYING
+
+  STATE_ERROR["STATE_ERROR<br/>Show error message"] -->|close| STATE_PLAYING
 ```

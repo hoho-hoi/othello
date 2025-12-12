@@ -19,10 +19,15 @@ mermaid の flowchart で記述する (UML コンポーネント図/配置図の
 
 ```mermaid
 flowchart LR
-  %% ここにプロジェクト固有のコンポーネント構成を記述する
-  %% 例:
-  %% CLIENT["Client UI"] -->|HTTP /api/play| API["Game API Server"]
-  %% API                 -->|SQL|           DB["GameDB"]
-  %% API                 -->|gRPC Match|    MATCH["MatchMaker"]
-  %% API                 -->|OAuth2|        AUTH["AuthService (外部)"]
+  USER["User"] -->|Tap / Click| UI["Othello Web UI (Mobile-friendly)"]
+
+  UI -->|Apply move / validate| ENGINE["Othello Rules Engine"]
+  UI -->|Render board + record sidebar| UI
+
+  UI -->|Save/Load current game| STORAGE["DeviceLocal Storage (IndexedDB / localStorage)"]
+
+  UI -->|Upload / Download| FILE["File I/O (Browser download/upload)"]
+  UI -->|Copy / Paste| CLIP["Clipboard API"]
+
+  %% No backend / no online sync.
 ```
