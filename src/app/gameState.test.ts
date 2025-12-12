@@ -551,6 +551,104 @@ describe('prepareImportRecordFromClipboard', () => {
   })
 })
 
+describe('prepareImportRecordFromFile', () => {
+  const createMockFile = (
+    content: string,
+    overrides?: {
+      size?: number
+      text?: () => Promise<string>
+    }
+  ): File =>
+    ({
+      size: overrides?.size ?? content.length,
+      name: 'record.json',
+      type: 'application/json',
+      lastModified: Date.now(),
+      text: overrides?.text ?? vi.fn().mockResolvedValue(content),
+      arrayBuffer: vi
+        .fn()
+        .mockResolvedValue(new TextEncoder().encode(content).buffer),
+      slice: vi.fn(),
+      stream: vi.fn(),
+    }) as unknown as File
+
+  const createValidMoves = (): readonly Move[] => [
+    {
+      moveNumber: 1,
+      color: 'BLACK',
+      row: 2,
+      col: 3,
+      isPass: false,
+    },
+  ]
+
+  it('should prepare import preview for valid file', async () => {
+    const { prepareImportRecordFromFile } = await import('./gameState')
+    const moves = createValidMoves()
+    const fileContent = JSON.stringify({
+      formatVersion: 1,
+      moves,
+    })
+    const file = createMockFile(fileContent)
+
+    const result = await prepareImportRecordFromFile(file)
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.preview.moves).toEqual(moves)
+      expect(result.preview.previewGameState.nextTurnColor).toBe('WHITE')
+      expect(result.preview.recordSizeBytes).toBeGreaterThan(0)
+    }
+  })
+
+  it('should reject oversized files before reading', async () => {
+    const { prepareImportRecordFromFile } = await import('./gameState')
+    const oversizedContent = 'a'.repeat(
+      deviceLocalStorage.MAX_RECORD_JSON_SIZE + 1
+    )
+    const file = createMockFile(oversizedContent, {
+      size: deviceLocalStorage.MAX_RECORD_JSON_SIZE + 1,
+    })
+
+    const result = await prepareImportRecordFromFile(file)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Record size exceeds limit')
+    }
+  })
+
+  it('should reject invalid schemas from file uploads', async () => {
+    const { prepareImportRecordFromFile } = await import('./gameState')
+    const invalidRecord = JSON.stringify({
+      formatVersion: 2,
+      moves: [],
+    })
+    const file = createMockFile(invalidRecord)
+
+    const result = await prepareImportRecordFromFile(file)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Record validation failed')
+    }
+  })
+
+  it('should surface file read errors', async () => {
+    const { prepareImportRecordFromFile } = await import('./gameState')
+    const brokenFile = createMockFile('{}', {
+      text: vi.fn().mockRejectedValue(new Error('Failed to read file')),
+    })
+
+    const result = await prepareImportRecordFromFile(brokenFile)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('File read error')
+    }
+  })
+})
+
 describe('importRecord', () => {
   beforeEach(() => {
     vi.clearAllMocks()
