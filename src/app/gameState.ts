@@ -14,6 +14,7 @@ import {
   recomputeBoardFromMovesValidated,
   isGameFinished,
   applyMove,
+  canPass,
 } from '../domain/rules'
 import {
   serializeRecordFormat,
@@ -237,6 +238,87 @@ export async function placeStone(
     return {
       success: false,
       error: `Move applied but save failed: ${saveResult.error}`,
+    }
+  }
+
+  return {
+    success: true,
+    newGameState,
+    newMoves,
+  }
+}
+
+/**
+ * Result type for passing turn
+ */
+export type PassTurnResult =
+  | {
+      readonly success: true
+      readonly newGameState: GameState
+      readonly newMoves: readonly Move[]
+    }
+  | { readonly success: false; readonly error: string }
+
+/**
+ * Pass turn when no legal moves available (R1, R2, R3, R4)
+ *
+ * R1: STATE_PLAYING 中、手番側に合法手が無い場合にパスが発生する
+ * R2: パスは棋譜に 1 手として追加される（isPass=true, row/col=null, moveNumber 連番）
+ * R3: パス後は手番が切り替わり、UI（Next turn / RecordSidebar）が更新される
+ * R4: 両者が連続してパス等の条件で対局終了となる場合、isFinished=true になる
+ */
+export async function passTurn(
+  gameState: GameState,
+  moves: readonly Move[]
+): Promise<PassTurnResult> {
+  // Check if game is already finished
+  if (gameState.isFinished) {
+    return { success: false, error: 'Game is already finished' }
+  }
+
+  // R1: Check if pass is allowed (no legal moves available)
+  if (!canPass(gameState.board, gameState.nextTurnColor)) {
+    return {
+      success: false,
+      error: 'Cannot pass: legal moves are available',
+    }
+  }
+
+  // R2: Create pass move record
+  const passMove: Move = {
+    moveNumber: moves.length + 1,
+    color: gameState.nextTurnColor,
+    row: null,
+    col: null,
+    isPass: true,
+  }
+
+  const newMoves: readonly Move[] = [...moves, passMove]
+
+  // R3: Switch turn color
+  const nextTurnColor: PieceColor =
+    gameState.nextTurnColor === 'BLACK' ? 'WHITE' : 'BLACK'
+
+  // R4: Check if game is finished (both players must pass consecutively)
+  const previousTurnColor = gameState.nextTurnColor
+  const isFinished = isGameFinished(
+    gameState.board,
+    nextTurnColor,
+    previousTurnColor
+  )
+
+  const newGameState: GameState = {
+    board: gameState.board, // Board doesn't change on pass
+    nextTurnColor,
+    isFinished,
+  }
+
+  // Save to DeviceLocal storage
+  const saveResult = saveGameToDeviceLocal(newMoves)
+  if (!saveResult.success) {
+    return {
+      success: false,
+      error: `Pass applied but save failed: ${saveResult.error}`,
     }
   }
 
