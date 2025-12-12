@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 import * as gameState from './app/gameState'
@@ -852,6 +852,138 @@ describe('App', () => {
       return { previewMoves, previewGameState }
     }
 
+    it('triggers hidden file input when Import (File) button is clicked', async () => {
+      const user = userEvent.setup()
+      const previewGameState = {
+        board: createInitialBoard(),
+        nextTurnColor: 'BLACK' as const,
+        isFinished: false,
+      }
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: previewGameState,
+        moves: [],
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      const fileInput = screen.getByTestId(
+        'import-file-input'
+      ) as HTMLInputElement
+      const clickSpy = vi.spyOn(fileInput, 'click')
+      const fileButton = screen.getByRole('button', {
+        name: /Import \(File\)/i,
+      })
+      await user.click(fileButton)
+
+      expect(clickSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows import confirmation dialog when valid file is selected', async () => {
+      const user = userEvent.setup()
+      const { previewMoves, previewGameState } = setupPreview()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: previewGameState,
+        moves: [],
+      })
+
+      vi.mocked(gameState.prepareImportRecordFromFile).mockResolvedValue({
+        success: true,
+        preview: {
+          moves: previewMoves,
+          previewGameState,
+          recordSizeBytes: 256,
+        },
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      const fileInput = screen.getByTestId(
+        'import-file-input'
+      ) as HTMLInputElement
+      const file = new File(
+        [
+          JSON.stringify({
+            formatVersion: 1,
+            moves: previewMoves,
+          }),
+        ],
+        'record.json',
+        { type: 'application/json' }
+      )
+
+      await user.click(
+        screen.getByRole('button', {
+          name: /Import \(File\)/i,
+        })
+      )
+
+      fireEvent.change(fileInput, {
+        target: { files: [file] },
+      })
+
+      await waitFor(() => {
+        expect(gameState.prepareImportRecordFromFile).toHaveBeenCalledTimes(1)
+        expect(screen.getByText(/Import Record/i)).toBeInTheDocument()
+      })
+    })
+
+    it('displays error when file preview fails', async () => {
+      const user = userEvent.setup()
+      const previewGameState = {
+        board: createInitialBoard(),
+        nextTurnColor: 'BLACK' as const,
+        isFinished: false,
+      }
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: previewGameState,
+        moves: [],
+      })
+
+      vi.mocked(gameState.prepareImportRecordFromFile).mockResolvedValue({
+        success: false,
+        error: 'File parsing failed',
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      const fileInput = screen.getByTestId(
+        'import-file-input'
+      ) as HTMLInputElement
+      const file = new File(['{}'], 'invalid.json', {
+        type: 'application/json',
+      })
+
+      await user.click(
+        screen.getByRole('button', {
+          name: /Import \(File\)/i,
+        })
+      )
+
+      fireEvent.change(fileInput, {
+        target: { files: [file] },
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText(/File parsing failed/i)).toBeInTheDocument()
+        expect(screen.getByTestId('board')).toBeInTheDocument()
+      })
+    })
+
     it('shows import confirmation dialog when preview succeeds', async () => {
       const user = userEvent.setup()
       const { previewMoves, previewGameState } = setupPreview()
@@ -877,7 +1009,7 @@ describe('App', () => {
       })
 
       const importButton = screen.getByRole('button', {
-        name: /import/i,
+        name: /Import \(Clipboard\)/i,
       })
       await user.click(importButton)
 
@@ -916,7 +1048,7 @@ describe('App', () => {
       })
 
       const importButton = screen.getByRole('button', {
-        name: /import/i,
+        name: /Import \(Clipboard\)/i,
       })
       await user.click(importButton)
 
@@ -956,7 +1088,7 @@ describe('App', () => {
       })
 
       const importButton = screen.getByRole('button', {
-        name: /import/i,
+        name: /Import \(Clipboard\)/i,
       })
       await user.click(importButton)
 
@@ -997,7 +1129,7 @@ describe('App', () => {
       })
 
       const importButton = screen.getByRole('button', {
-        name: /import/i,
+        name: /Import \(Clipboard\)/i,
       })
       await user.click(importButton)
 
@@ -1047,7 +1179,7 @@ describe('App', () => {
       })
 
       const importButton = screen.getByRole('button', {
-        name: /import/i,
+        name: /Import \(Clipboard\)/i,
       })
       await user.click(importButton)
 

@@ -284,6 +284,53 @@ export type PrepareImportResult =
   | { readonly success: true; readonly preview: ImportPreview }
   | { readonly success: false; readonly error: string }
 
+function buildImportPreviewFromText(recordText: string): PrepareImportResult {
+  if (recordText.length > MAX_RECORD_JSON_SIZE) {
+    return {
+      success: false,
+      error: `Record size exceeds limit: ${recordText.length} bytes > ${MAX_RECORD_JSON_SIZE} bytes`,
+    }
+  }
+
+  const parseResult = parseRecordFormat(recordText)
+  if (!parseResult.success) {
+    return {
+      success: false,
+      error: `Record validation failed: ${parseResult.error}`,
+    }
+  }
+
+  if (!parseResult.record) {
+    return {
+      success: false,
+      error: 'Record parsing produced no data',
+    }
+  }
+
+  const moves = parseResult.record.moves
+  const recomputeResult = recomputeBoardFromMovesValidated(moves)
+  if (!recomputeResult.success) {
+    return {
+      success: false,
+      error: `Rule validation failed: ${recomputeResult.error}`,
+    }
+  }
+
+  const previewGameState = createGameStateFromBoard(
+    recomputeResult.board,
+    moves
+  )
+
+  return {
+    success: true,
+    preview: {
+      moves,
+      previewGameState,
+      recordSizeBytes: recordText.length,
+    },
+  }
+}
+
 /**
  * Prepare import record (clipboard) by performing staged validation.
  *
@@ -305,57 +352,56 @@ export async function prepareImportRecordFromClipboard(): Promise<PrepareImportR
 
   try {
     const clipboardText = await navigator.clipboard.readText()
-
-    if (clipboardText.length > MAX_RECORD_JSON_SIZE) {
-      return {
-        success: false,
-        error: `Record size exceeds limit: ${clipboardText.length} bytes > ${MAX_RECORD_JSON_SIZE} bytes`,
-      }
-    }
-
-    const parseResult = parseRecordFormat(clipboardText)
-    if (!parseResult.success) {
-      return {
-        success: false,
-        error: `Record validation failed: ${parseResult.error}`,
-      }
-    }
-
-    if (!parseResult.record) {
-      return {
-        success: false,
-        error: 'Record parsing produced no data',
-      }
-    }
-
-    const moves = parseResult.record.moves
-    const recomputeResult = recomputeBoardFromMovesValidated(moves)
-    if (!recomputeResult.success) {
-      return {
-        success: false,
-        error: `Rule validation failed: ${recomputeResult.error}`,
-      }
-    }
-
-    const previewGameState = createGameStateFromBoard(
-      recomputeResult.board,
-      moves
-    )
-
-    return {
-      success: true,
-      preview: {
-        moves,
-        previewGameState,
-        recordSizeBytes: clipboardText.length,
-      },
-    }
+    return buildImportPreviewFromText(clipboardText)
   } catch (error) {
     const message =
       error instanceof Error ? error.message : String(error ?? 'Unknown error')
     return {
       success: false,
       error: `Clipboard read error: ${message}`,
+    }
+  }
+}
+
+async function readFileAsText(file: File): Promise<string> {
+  if (typeof file.text === 'function') {
+    return file.text()
+  }
+
+  if (typeof file.arrayBuffer === 'function') {
+    const buffer = await file.arrayBuffer()
+    const decoder = new TextDecoder()
+    return decoder.decode(buffer)
+  }
+
+  throw new Error('File API does not support text() or arrayBuffer()')
+}
+
+/**
+ * Prepare import record (file upload) using the same staged validation steps
+ * as clipboard import.
+ *
+ * @param file - User-selected JSON file that encodes the record format.
+ */
+export async function prepareImportRecordFromFile(
+  file: File
+): Promise<PrepareImportResult> {
+  if (file.size > MAX_RECORD_JSON_SIZE) {
+    return {
+      success: false,
+      error: `Record size exceeds limit: ${file.size} bytes > ${MAX_RECORD_JSON_SIZE} bytes`,
+    }
+  }
+
+  try {
+    const fileText = await readFileAsText(file)
+    return buildImportPreviewFromText(fileText)
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : String(error ?? 'Unknown error')
+    return {
+      success: false,
+      error: `File read error: ${message}`,
     }
   }
 }

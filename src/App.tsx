@@ -6,7 +6,7 @@
  * R3: Save/Load失敗時はクラッシュせず、STATE_ERRORへ遷移できる
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   initializeGame,
   placeStone,
@@ -14,6 +14,7 @@ import {
   exportRecordToClipboard,
   exportRecordToFile,
   prepareImportRecordFromClipboard,
+  prepareImportRecordFromFile,
   importRecord,
   type AppState,
 } from './app/gameState'
@@ -23,6 +24,7 @@ import { RecordSidebar } from './components/RecordSidebar'
 function App() {
   const [appState, setAppState] = useState<AppState>({ type: 'LOADING' })
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const statusMessageElement = statusMessage ? (
     <p className="status-message" role="status">
       {statusMessage}
@@ -156,13 +158,50 @@ function App() {
       })
     }
 
-    const handleImportClick = async () => {
+    const handleImportClipboardClick = async () => {
       if (appState.type !== 'PLAYING') {
         return
       }
       const currentState = appState
       setStatusMessage(null)
       const result = await prepareImportRecordFromClipboard()
+      if (!result.success) {
+        setStatusMessage(result.error)
+        return
+      }
+
+      setAppState({
+        type: 'IMPORT_CONFIRM',
+        previousGameState: currentState.gameState,
+        previousMoves: currentState.moves,
+        pendingImport: result.preview,
+      })
+    }
+
+    const handleImportFileButtonClick = () => {
+      if (fileInputRef.current) {
+        setStatusMessage(null)
+        fileInputRef.current.click()
+      }
+    }
+
+    const handleFileSelection = async (
+      event: ChangeEvent<HTMLInputElement>
+    ) => {
+      if (appState.type !== 'PLAYING') {
+        event.target.value = ''
+        return
+      }
+
+      const file = event.target.files?.[0] ?? null
+      event.target.value = ''
+      if (!file) {
+        return
+      }
+
+      const currentState = appState
+      setStatusMessage(null)
+      const result = await prepareImportRecordFromFile(file)
       if (!result.success) {
         setStatusMessage(result.error)
         return
@@ -183,7 +222,18 @@ function App() {
         <div>
           <button onClick={handleNewGameClick}>New Game</button>
           <button onClick={handleExportClick}>Export</button>
-          <button onClick={handleImportClick}>Import (Clipboard)</button>
+          <button onClick={handleImportClipboardClick}>
+            Import (Clipboard)
+          </button>
+          <button onClick={handleImportFileButtonClick}>Import (File)</button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json"
+            data-testid="import-file-input"
+            style={{ display: 'none' }}
+            onChange={handleFileSelection}
+          />
         </div>
         <div className="game-container">
           <div className="board-container">
