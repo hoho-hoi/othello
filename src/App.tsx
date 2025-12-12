@@ -7,7 +7,12 @@
  */
 
 import { useEffect, useState } from 'react'
-import { initializeGame, placeStone, type AppState } from './app/gameState'
+import {
+  initializeGame,
+  placeStone,
+  startNewGame,
+  type AppState,
+} from './app/gameState'
 import { Board } from './components/Board'
 import { RecordSidebar } from './components/RecordSidebar'
 
@@ -119,9 +124,20 @@ function App() {
       }
     }
 
+    const handleNewGameClick = () => {
+      // R1: STATE_PLAYING から New Game 操作ができる
+      setAppState({
+        type: 'NEW_GAME_CONFIRM',
+        previousState: 'PLAYING',
+        previousGameState: appState.gameState,
+        previousMoves: appState.moves,
+      })
+    }
+
     return (
       <div className="app-playing">
         <h1>Othello</h1>
+        <button onClick={handleNewGameClick}>New Game</button>
         <div className="game-container">
           <div className="board-container">
             <p>Next turn: {appState.gameState.nextTurnColor}</p>
@@ -137,10 +153,72 @@ function App() {
   }
 
   if (appState.type === 'RESULT') {
+    const handleNewGameClick = () => {
+      // R1: STATE_RESULT から New Game 操作ができる
+      setAppState({
+        type: 'NEW_GAME_CONFIRM',
+        previousState: 'RESULT',
+        previousGameState: appState.gameState,
+        previousMoves: appState.moves,
+      })
+    }
+
     return (
       <div>
         <h1>Othello</h1>
         <p>Game finished.</p>
+        <button onClick={handleNewGameClick}>New Game</button>
+      </div>
+    )
+  }
+
+  if (appState.type === 'NEW_GAME_CONFIRM') {
+    const handleConfirm = async () => {
+      // R2: Confirm で新規ゲーム生成・保存
+      const result = await startNewGame()
+
+      if (result.success) {
+        // R3: 新規ゲーム生成後、UIは STATE_PLAYING に遷移し、棋譜は空（moves=[]）相当から開始できる
+        setAppState({
+          type: 'PLAYING',
+          gameState: result.gameState,
+          moves: result.moves,
+        })
+      } else {
+        // R4: DeviceLocal 保存失敗時はクラッシュせず、ユーザに分かる形でエラーを提示する
+        setAppState({
+          type: 'ERROR',
+          error: result.error,
+        })
+      }
+    }
+
+    const handleCancel = () => {
+      // R2: Cancel で元の状態に戻る
+      if (appState.previousState === 'PLAYING') {
+        setAppState({
+          type: 'PLAYING',
+          gameState: appState.previousGameState,
+          moves: appState.previousMoves,
+        })
+      } else {
+        setAppState({
+          type: 'RESULT',
+          gameState: appState.previousGameState,
+          moves: appState.previousMoves,
+        })
+      }
+    }
+
+    return (
+      <div>
+        <h1>Othello</h1>
+        <div>
+          <h2>Start New Game</h2>
+          <p>Current game will be abandoned. Are you sure?</p>
+          <button onClick={handleConfirm}>Confirm</button>
+          <button onClick={handleCancel}>Cancel</button>
+        </div>
       </div>
     )
   }

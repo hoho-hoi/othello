@@ -32,6 +32,12 @@ export type AppState =
       readonly gameState: GameState
       readonly moves: readonly Move[]
     }
+  | {
+      readonly type: 'NEW_GAME_CONFIRM'
+      readonly previousState: 'PLAYING' | 'RESULT'
+      readonly previousGameState: GameState
+      readonly previousMoves: readonly Move[]
+    }
 
 /**
  * Game initialization result
@@ -199,5 +205,36 @@ export async function placeStone(
     success: true,
     newGameState,
     newMoves,
+  }
+}
+
+/**
+ * Start new game (OP_START_NEW_GAME)
+ *
+ * R3: 新規ゲーム生成後、UIは STATE_PLAYING に遷移し、棋譜は空（moves=[]）相当から開始できる
+ * R4: DeviceLocal 保存失敗時はクラッシュせず、ユーザに分かる形でエラーを提示する
+ */
+export async function startNewGame(): Promise<GameInitializationResult> {
+  // Create new game with initial board
+  const initialBoard = createInitialBoard()
+  const gameState: GameState = {
+    board: initialBoard,
+    nextTurnColor: 'BLACK',
+    isFinished: false,
+  }
+
+  // R4: Save to DeviceLocal storage
+  const saveResult = saveGameToDeviceLocal([])
+  if (!saveResult.success) {
+    return {
+      success: false,
+      error: `Failed to save new game: ${saveResult.error}`,
+    }
+  }
+
+  return {
+    success: true,
+    gameState,
+    moves: [],
   }
 }
