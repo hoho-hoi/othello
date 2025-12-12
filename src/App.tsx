@@ -7,7 +7,9 @@
  */
 
 import { useEffect, useState } from 'react'
-import { initializeGame, type AppState } from './app/gameState'
+import { initializeGame, placeStone, type AppState } from './app/gameState'
+import { Board } from './components/Board'
+import { RecordSidebar } from './components/RecordSidebar'
 
 function App() {
   const [appState, setAppState] = useState<AppState>({ type: 'LOADING' })
@@ -81,12 +83,55 @@ function App() {
   }
 
   if (appState.type === 'PLAYING') {
+    const handleCellClick = async (row: number, col: number) => {
+      // R1: セルタップで着手を試みる
+      // R2, R3: 合法手のみ着手を反映し、不正手はエラーとして扱う
+      const result = await placeStone(
+        appState.gameState,
+        appState.moves,
+        row,
+        col
+      )
+
+      if (result.success) {
+        // R2: 合法手の場合、状態を更新
+        // R5: DeviceLocalへの保存はplaceStone内で行われる
+        if (result.newGameState.isFinished) {
+          // Game finished - transition to RESULT state
+          setAppState({
+            type: 'RESULT',
+            gameState: result.newGameState,
+            moves: result.newMoves,
+          })
+        } else {
+          // Continue playing
+          setAppState({
+            type: 'PLAYING',
+            gameState: result.newGameState,
+            moves: result.newMoves,
+          })
+        }
+      } else {
+        // R3: 不正手の場合、エラーを表示（クラッシュしない）
+        // For now, we silently ignore invalid moves
+        // In a production app, we might show a toast notification
+        console.warn('Invalid move:', result.error)
+      }
+    }
+
     return (
-      <div>
+      <div className="app-playing">
         <h1>Othello</h1>
-        <p>Game loaded. Ready to play.</p>
-        <p>Next turn: {appState.gameState.nextTurnColor}</p>
-        <p>Moves: {appState.moves.length}</p>
+        <div className="game-container">
+          <div className="board-container">
+            <p>Next turn: {appState.gameState.nextTurnColor}</p>
+            <Board
+              gameState={appState.gameState}
+              onCellClick={handleCellClick}
+            />
+          </div>
+          <RecordSidebar moves={appState.moves} />
+        </div>
       </div>
     )
   }

@@ -27,3 +27,83 @@ body {
   padding: 2rem;
   text-align: center;
 }
+
+/* Game container layout */
+.game-container {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  align-items: flex-start;
+  margin-top: 2rem;
+}
+
+.board-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Board styles */
+.board {
+  display: inline-block;
+  border: 2px solid #333;
+  background-color: #2d5016;
+}
+
+.board-row {
+  display: flex;
+}
+
+.board-cell {
+  width: 50px;
+  height: 50px;
+  border: 1px solid #555;
+  background-color: #2d5016;
+  color: #fff;
+  font-size: 30px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.board-cell:hover {
+  background-color: #3a6b1f;
+}
+
+.board-cell:active {
+  background-color: #4a7b2f;
+}
+
+/* Record sidebar styles */
+.record-sidebar {
+  min-width: 200px;
+  max-width: 300px;
+  padding: 1rem;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background-color: #1a1a1a;
+  text-align: left;
+}
+
+.record-sidebar h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+}
+
+.record-sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.record-sidebar li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #333;
+}
+
+.record-sidebar li:last-child {
+  border-bottom: none;
+}

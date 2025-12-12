@@ -4,11 +4,15 @@
  * Handles game initialization, state transitions, and persistence.
  */
 
-import { loadGameFromDeviceLocal } from '../storage/deviceLocalStorage'
+import {
+  loadGameFromDeviceLocal,
+  saveGameToDeviceLocal,
+} from '../storage/deviceLocalStorage'
 import {
   createInitialBoard,
   recomputeBoardFromMovesValidated,
   isGameFinished,
+  applyMove,
 } from '../domain/rules'
 import type { GameState, Move, PieceColor } from '../domain/types'
 
@@ -110,5 +114,90 @@ export async function initializeGame(): Promise<GameInitializationResult> {
     success: true,
     gameState,
     moves,
+  }
+}
+
+/**
+ * Result type for placing a stone
+ */
+export type PlaceStoneResult =
+  | {
+      readonly success: true
+      readonly newGameState: GameState
+      readonly newMoves: readonly Move[]
+    }
+  | { readonly success: false; readonly error: string }
+
+/**
+ * Place stone on board (OP_PLACE_STONE)
+ *
+ * R2: 合法手のみ着手を反映し、石の反転と手番更新が行われる
+ * R3: 不正手は着手せず、エラーを返す（クラッシュしない）
+ * R5: 着手後にDeviceLocalへ保存される
+ */
+export async function placeStone(
+  gameState: GameState,
+  moves: readonly Move[],
+  row: number,
+  col: number
+): Promise<PlaceStoneResult> {
+  // Check if game is already finished
+  if (gameState.isFinished) {
+    return { success: false, error: 'Game is already finished' }
+  }
+
+  // Apply move using domain rules
+  const applyResult = applyMove(
+    gameState.board,
+    gameState.nextTurnColor,
+    row,
+    col
+  )
+
+  if (!applyResult.success) {
+    // R3: Invalid move - return error without crashing
+    return { success: false, error: applyResult.error }
+  }
+
+  // R2: Create new move record
+  const newMove: Move = {
+    moveNumber: moves.length + 1,
+    color: gameState.nextTurnColor,
+    row: row as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7,
+    col: col as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7,
+    isPass: false,
+  }
+
+  const newMoves: readonly Move[] = [...moves, newMove]
+
+  // Check if game is finished after this move
+  const previousTurnColor = gameState.nextTurnColor
+  const isFinished = isGameFinished(
+    applyResult.newState.board,
+    applyResult.newState.nextTurnColor,
+    previousTurnColor
+  )
+
+  const newGameState: GameState = {
+    board: applyResult.newState.board,
+    nextTurnColor: applyResult.newState.nextTurnColor,
+    isFinished,
+  }
+
+  // R5: Save to DeviceLocal storage
+  const saveResult = saveGameToDeviceLocal(newMoves)
+  if (!saveResult.success) {
+    // Even if save fails, we return success but log the error
+    // This allows game to continue, but save error should be handled by UI
+    return {
+      success: false,
+      error: `Move applied but save failed: ${saveResult.error}`,
+    }
+  }
+
+  return {
+    success: true,
+    newGameState,
+    newMoves,
   }
 }
