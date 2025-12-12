@@ -337,4 +337,495 @@ describe('App', () => {
       expect(screen.getByText(/storage quota exceeded/i)).toBeInTheDocument()
     })
   })
+
+  describe('Export functionality', () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+    })
+
+    it('should show export dialog when Export button is clicked from PLAYING state', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: [],
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Click Export button
+      const exportButton = screen.getByRole('button', { name: /export/i })
+      await user.click(exportButton)
+
+      // Should show export dialog
+      expect(screen.getByText(/export record/i)).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: /copy to clipboard/i })
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: /download as file/i })
+      ).toBeInTheDocument()
+    })
+
+    it('should show export dialog when Export button is clicked from RESULT state', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: true,
+        },
+        moves: [],
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Click Export button
+      const exportButton = screen.getByRole('button', { name: /export/i })
+      await user.click(exportButton)
+
+      // Should show export dialog
+      expect(screen.getByText(/export record/i)).toBeInTheDocument()
+    })
+
+    it('should export to clipboard successfully and return to PLAYING state', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      const moves = [
+        {
+          moveNumber: 1,
+          color: 'BLACK' as const,
+          row: 2 as const,
+          col: 3 as const,
+          isPass: false,
+        },
+      ]
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: moves,
+      })
+
+      // Mock exportRecordToClipboard
+      vi.mocked(gameState.exportRecordToClipboard).mockResolvedValue({
+        success: true,
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Click Export button
+      const exportButton = screen.getByRole('button', { name: /export/i })
+      await user.click(exportButton)
+
+      // Click Copy to Clipboard button
+      const clipboardButton = screen.getByRole('button', {
+        name: /copy to clipboard/i,
+      })
+      await user.click(clipboardButton)
+
+      // Should call exportRecordToClipboard
+      expect(gameState.exportRecordToClipboard).toHaveBeenCalledTimes(1)
+      expect(gameState.exportRecordToClipboard).toHaveBeenCalledWith(moves)
+
+      // Should return to PLAYING state
+      await waitFor(() => {
+        expect(screen.queryByText(/export record/i)).not.toBeInTheDocument()
+        expect(screen.getByTestId('board')).toBeInTheDocument()
+      })
+    })
+
+    it('should export to file successfully from PLAYING state and return to PLAYING state', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      const moves = [
+        {
+          moveNumber: 1,
+          color: 'BLACK' as const,
+          row: 2 as const,
+          col: 3 as const,
+          isPass: false,
+        },
+      ]
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: moves,
+      })
+
+      // Mock exportRecordToFile - must be set before render
+      vi.mocked(gameState.exportRecordToFile).mockResolvedValue({
+        success: true,
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Verify we're in PLAYING state
+      expect(screen.getByTestId('board')).toBeInTheDocument()
+
+      // Click Export button
+      const exportButton = screen.getByRole('button', { name: /export/i })
+      await user.click(exportButton)
+
+      // Verify export dialog is shown
+      await waitFor(() => {
+        expect(screen.getByText(/export record/i)).toBeInTheDocument()
+      })
+
+      // Click Download as File button
+      const fileButton = screen.getByRole('button', {
+        name: /download as file/i,
+      })
+      await user.click(fileButton)
+
+      // Should call exportRecordToFile
+      await waitFor(() => {
+        expect(gameState.exportRecordToFile).toHaveBeenCalledTimes(1)
+        expect(gameState.exportRecordToFile).toHaveBeenCalledWith(moves)
+      })
+
+      // Should return to PLAYING state
+      await waitFor(
+        () => {
+          expect(screen.queryByText(/export record/i)).not.toBeInTheDocument()
+          expect(screen.getByTestId('board')).toBeInTheDocument()
+        },
+        { timeout: 3000 }
+      )
+    })
+
+    it('should show error when clipboard export fails', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: [],
+      })
+
+      // Mock exportRecordToClipboard to return error
+      vi.mocked(gameState.exportRecordToClipboard).mockResolvedValue({
+        success: false,
+        error: 'Permission denied',
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Click Export button
+      const exportButton = screen.getByRole('button', { name: /export/i })
+      await user.click(exportButton)
+
+      // Click Copy to Clipboard button
+      const clipboardButton = screen.getByRole('button', {
+        name: /copy to clipboard/i,
+      })
+      await user.click(clipboardButton)
+
+      // Should show error message
+      await waitFor(() => {
+        expect(screen.getByText(/error/i)).toBeInTheDocument()
+        expect(screen.getByText(/permission denied/i)).toBeInTheDocument()
+      })
+    })
+
+    it('should show error when file export fails', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: [],
+      })
+
+      // Mock exportRecordToFile to return error
+      vi.mocked(gameState.exportRecordToFile).mockResolvedValue({
+        success: false,
+        error: 'Failed to create object URL',
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Click Export button
+      const exportButton = screen.getByRole('button', { name: /export/i })
+      await user.click(exportButton)
+
+      // Click Download as File button
+      const fileButton = screen.getByRole('button', {
+        name: /download as file/i,
+      })
+      await user.click(fileButton)
+
+      // Should show error message
+      await waitFor(() => {
+        expect(screen.getByText(/error/i)).toBeInTheDocument()
+        expect(
+          screen.getByText(/failed to create object url/i)
+        ).toBeInTheDocument()
+      })
+    })
+
+    it('should return to previous state when Cancel is clicked in export dialog', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: [],
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Click Export button
+      const exportButton = screen.getByRole('button', { name: /export/i })
+      await user.click(exportButton)
+
+      // Click Cancel button
+      const cancelButton = screen.getByRole('button', { name: /cancel/i })
+      await user.click(cancelButton)
+
+      // Should return to PLAYING state
+      expect(screen.getByTestId('board')).toBeInTheDocument()
+      expect(screen.queryByText(/export record/i)).not.toBeInTheDocument()
+    })
+
+    it('should export to clipboard successfully from RESULT state and return to RESULT state', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      const moves = [
+        {
+          moveNumber: 1,
+          color: 'BLACK' as const,
+          row: 2 as const,
+          col: 3 as const,
+          isPass: false,
+        },
+      ]
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: moves,
+      })
+
+      // Mock placeStone to transition to RESULT state
+      vi.mocked(gameState.placeStone).mockResolvedValue({
+        success: true,
+        newGameState: {
+          board: initialBoard,
+          nextTurnColor: 'WHITE',
+          isFinished: true,
+        },
+        newMoves: [
+          ...moves,
+          {
+            moveNumber: 2,
+            color: 'WHITE' as const,
+            row: 3 as const,
+            col: 2 as const,
+            isPass: false,
+          },
+        ],
+      })
+
+      // Mock exportRecordToClipboard
+      vi.mocked(gameState.exportRecordToClipboard).mockResolvedValue({
+        success: true,
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Make a move to transition to RESULT state
+      const board = screen.getByTestId('board')
+      const cells = board.querySelectorAll('button')
+      await user.click(cells[0] as HTMLElement)
+
+      // Wait for RESULT state
+      await waitFor(() => {
+        expect(screen.getByText(/Game finished/i)).toBeInTheDocument()
+      })
+
+      // Click Export button from RESULT state
+      const exportButton = screen.getByRole('button', { name: /export/i })
+      await user.click(exportButton)
+
+      // Verify export dialog is shown
+      await waitFor(() => {
+        expect(screen.getByText(/export record/i)).toBeInTheDocument()
+      })
+
+      // Click Copy to Clipboard button
+      const clipboardButton = screen.getByRole('button', {
+        name: /copy to clipboard/i,
+      })
+      await user.click(clipboardButton)
+
+      // Should call exportRecordToClipboard
+      await waitFor(() => {
+        expect(gameState.exportRecordToClipboard).toHaveBeenCalledTimes(1)
+      })
+
+      // Should return to RESULT state
+      await waitFor(
+        () => {
+          expect(screen.queryByText(/export record/i)).not.toBeInTheDocument()
+          expect(screen.getByText(/Game finished/i)).toBeInTheDocument()
+        },
+        { timeout: 3000 }
+      )
+    })
+
+    it('should export to file successfully from RESULT state and return to RESULT state', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      const moves = [
+        {
+          moveNumber: 1,
+          color: 'BLACK' as const,
+          row: 2 as const,
+          col: 3 as const,
+          isPass: false,
+        },
+      ]
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: moves,
+      })
+
+      // Mock placeStone to transition to RESULT state
+      vi.mocked(gameState.placeStone).mockResolvedValue({
+        success: true,
+        newGameState: {
+          board: initialBoard,
+          nextTurnColor: 'WHITE',
+          isFinished: true,
+        },
+        newMoves: [
+          ...moves,
+          {
+            moveNumber: 2,
+            color: 'WHITE' as const,
+            row: 3 as const,
+            col: 2 as const,
+            isPass: false,
+          },
+        ],
+      })
+
+      // Mock exportRecordToFile
+      vi.mocked(gameState.exportRecordToFile).mockResolvedValue({
+        success: true,
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Make a move to transition to RESULT state
+      const board = screen.getByTestId('board')
+      const cells = board.querySelectorAll('button')
+      await user.click(cells[0] as HTMLElement)
+
+      // Wait for RESULT state
+      await waitFor(() => {
+        expect(screen.getByText(/Game finished/i)).toBeInTheDocument()
+      })
+
+      // Click Export button from RESULT state
+      const exportButton = screen.getByRole('button', { name: /export/i })
+      await user.click(exportButton)
+
+      // Verify export dialog is shown
+      await waitFor(() => {
+        expect(screen.getByText(/export record/i)).toBeInTheDocument()
+      })
+
+      // Click Download as File button
+      const fileButton = screen.getByRole('button', {
+        name: /download as file/i,
+      })
+      await user.click(fileButton)
+
+      // Should call exportRecordToFile
+      await waitFor(() => {
+        expect(gameState.exportRecordToFile).toHaveBeenCalledTimes(1)
+      })
+
+      // Should return to RESULT state
+      await waitFor(
+        () => {
+          expect(screen.queryByText(/export record/i)).not.toBeInTheDocument()
+          expect(screen.getByText(/Game finished/i)).toBeInTheDocument()
+        },
+        { timeout: 3000 }
+      )
+    })
+  })
 })

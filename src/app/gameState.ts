@@ -14,6 +14,10 @@ import {
   isGameFinished,
   applyMove,
 } from '../domain/rules'
+import {
+  serializeRecordFormat,
+  type RecordFormat,
+} from '../storage/recordFormat'
 import type { GameState, Move, PieceColor } from '../domain/types'
 
 /**
@@ -37,6 +41,12 @@ export type AppState =
       readonly previousState: 'PLAYING' | 'RESULT'
       readonly previousGameState: GameState
       readonly previousMoves: readonly Move[]
+    }
+  | {
+      readonly type: 'EXPORTING'
+      readonly originState: 'PLAYING' | 'RESULT'
+      readonly gameState: GameState
+      readonly moves: readonly Move[]
     }
 
 /**
@@ -236,5 +246,102 @@ export async function startNewGame(): Promise<GameInitializationResult> {
     success: true,
     gameState,
     moves: [],
+  }
+}
+
+/**
+ * Export record result
+ */
+export type ExportRecordResult =
+  | { readonly success: true }
+  | { readonly success: false; readonly error: string }
+
+/**
+ * Export record to clipboard (OP_EXPORT_RECORD_TO_CLIPBOARD)
+ *
+ * R2: Export 先として Clipboard を提供する
+ * R3: 出力形式は Record Format（moves-only / formatVersion=1）に準拠する
+ * R5: 失敗時はクラッシュせず、ユーザに分かる形でエラーを提示する
+ */
+export async function exportRecordToClipboard(
+  moves: readonly Move[]
+): Promise<ExportRecordResult> {
+  try {
+    // R3: Create Record Format with formatVersion=1
+    const record: RecordFormat = {
+      formatVersion: 1,
+      moves: moves,
+    }
+
+    // Serialize to JSON string
+    const jsonString = serializeRecordFormat(record)
+
+    // Write to clipboard
+    await navigator.clipboard.writeText(jsonString)
+
+    return { success: true }
+  } catch (error) {
+    // R5: Handle errors gracefully
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : error instanceof DOMException
+          ? error.message
+          : 'Unknown clipboard error'
+    return {
+      success: false,
+      error: `Failed to export to clipboard: ${errorMessage}`,
+    }
+  }
+}
+
+/**
+ * Export record to file (OP_EXPORT_RECORD_TO_FILE)
+ *
+ * R2: Export 先として File（download）を提供する
+ * R3: 出力形式は Record Format（moves-only / formatVersion=1）に準拠する
+ * R5: 失敗時はクラッシュせず、ユーザに分かる形でエラーを提示する
+ */
+export async function exportRecordToFile(
+  moves: readonly Move[]
+): Promise<ExportRecordResult> {
+  try {
+    // R3: Create Record Format with formatVersion=1
+    const record: RecordFormat = {
+      formatVersion: 1,
+      moves: moves,
+    }
+
+    // Serialize to JSON string
+    const jsonString = serializeRecordFormat(record)
+
+    // Create Blob with JSON content
+    const blob = new Blob([jsonString], { type: 'application/json' })
+
+    // Create object URL
+    const url = URL.createObjectURL(blob)
+
+    // Create temporary link element
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'othello-record.json'
+    document.body.appendChild(link)
+
+    // Trigger download
+    link.click()
+
+    // Cleanup
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    return { success: true }
+  } catch (error) {
+    // R5: Handle errors gracefully
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown file export error'
+    return {
+      success: false,
+      error: `Failed to export to file: ${errorMessage}`,
+    }
   }
 }
