@@ -7,7 +7,7 @@
 import { loadGameFromDeviceLocal } from '../storage/deviceLocalStorage'
 import {
   createInitialBoard,
-  recomputeBoardFromMoves,
+  recomputeBoardFromMovesValidated,
   isGameFinished,
 } from '../domain/rules'
 import type { GameState, Move, PieceColor } from '../domain/types'
@@ -74,8 +74,17 @@ export async function initializeGame(): Promise<GameInitializationResult> {
   // Restore game from saved moves
   const moves = loadResult.record.moves
 
-  // Recompute board state from moves (R2: movesを真実源にし、派生情報は再計算)
-  const board = recomputeBoardFromMoves(moves)
+  // Recompute board state from moves with rule consistency validation
+  // R2: movesを真実源にし、派生情報は再計算
+  // Rule consistency check: validate legal moves, pass validity, turn consistency
+  const recomputeResult = recomputeBoardFromMovesValidated(moves)
+  if (!recomputeResult.success) {
+    return {
+      success: false,
+      error: `Invalid game record: ${recomputeResult.error}`,
+    }
+  }
+  const board = recomputeResult.board
 
   // Determine next turn color
   // After applying all moves, next turn should be opposite of last move color

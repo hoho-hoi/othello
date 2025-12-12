@@ -120,11 +120,14 @@ export function loadGameFromDeviceLocal(): LoadGameResult {
 /**
  * Clear saved game from DeviceLocal storage
  */
-export function clearGameFromDeviceLocal(): void {
+export function clearGameFromDeviceLocal(): StorageResult<void> {
   try {
     localStorage.removeItem(STORAGE_KEY)
+    return { success: true, data: undefined }
   } catch (error) {
-    // Silently ignore clear errors (non-critical)
-    console.warn('Failed to clear storage:', error)
+    return {
+      success: false,
+      error: `Failed to clear storage: ${error instanceof Error ? error.message : String(error)}`,
+    }
   }
 }

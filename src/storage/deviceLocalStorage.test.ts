@@ -198,7 +198,8 @@ describe('DeviceLocal Storage', () => {
         expect(loadBeforeClear.record).toBeTruthy()
       }
 
-      clearGameFromDeviceLocal()
+      const clearResult = clearGameFromDeviceLocal()
+      expect(clearResult.success).toBe(true)
 
       // After clear, should return null
       const loadResult = loadGameFromDeviceLocal()

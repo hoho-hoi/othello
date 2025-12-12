@@ -296,3 +296,70 @@ export function recomputeBoardFromMoves(moves: readonly Move[]): Board {
 
   return board
 }
+
+/**
+ * Result type for validated board recomputation
+ */
+export type RecomputeBoardResult =
+  | { readonly success: true; readonly board: Board }
+  | { readonly success: false; readonly error: string }
+
+/**
+ * Recompute board state from moves sequence with rule consistency validation
+ *
+ * Validates:
+ * - Non-pass moves: applyMove must succeed (legal move)
+ * - Pass moves: canPass must be true (no legal moves available)
+ * - Turn consistency: move.color must match expected turn color
+ *
+ * Used for restoring games from DeviceLocal storage to ensure data integrity.
+ */
+export function recomputeBoardFromMovesValidated(
+  moves: readonly Move[]
+): RecomputeBoardResult {
+  let board = createInitialBoard()
+  let currentTurnColor: PieceColor = 'BLACK'
+
+  for (const move of moves) {
+    // Validate turn consistency
+    if (move.color !== currentTurnColor) {
+      return {
+        success: false,
+        error: `Move ${move.moveNumber}: Expected ${currentTurnColor}, got ${move.color}`,
+      }
+    }
+
+    if (move.isPass) {
+      // Validate pass move: must have no legal moves
+      if (!canPass(board, currentTurnColor)) {
+        return {
+          success: false,
+          error: `Move ${move.moveNumber}: Pass move invalid - legal moves available for ${currentTurnColor}`,
+        }
+      }
+      // Pass: just switch turn
+      currentTurnColor = getOpponentColor(currentTurnColor)
+    } else {
+      // Validate normal move: must be legal
+      if (move.row === null || move.col === null) {
+        return {
+          success: false,
+          error: `Move ${move.moveNumber}: Non-pass move must have row and col`,
+        }
+      }
+
+      const result = applyMove(board, move.color, move.row, move.col)
+      if (!result.success) {
+        return {
+          success: false,
+          error: `Move ${move.moveNumber}: ${result.error}`,
+        }
+      }
+
+      board = result.newState.board
+      currentTurnColor = result.newState.nextTurnColor
+    }
+  }
+
+  return { success: true, board }
+}

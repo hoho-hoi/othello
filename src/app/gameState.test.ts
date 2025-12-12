@@ -33,19 +33,14 @@ describe('initializeGame', () => {
   })
 
   it('should restore game from saved moves', async () => {
+    // Use a single legal move to avoid turn consistency issues
+    // Initial board: BLACK can play at (2,3), (3,2), (4,5), (5,4)
     const savedMoves = [
       {
         moveNumber: 1,
         color: 'BLACK' as const,
         row: 2 as const,
         col: 3 as const,
-        isPass: false,
-      },
-      {
-        moveNumber: 2,
-        color: 'WHITE' as const,
-        row: 4 as const,
-        col: 5 as const,
         isPass: false,
       },
     ]
@@ -66,6 +61,95 @@ describe('initializeGame', () => {
       expect(result.moves).toEqual(savedMoves)
       // Board should be recomputed from moves
       expect(result.gameState.board).toBeTruthy()
+      // After BLACK's move, next turn should be WHITE
+      expect(result.gameState.nextTurnColor).toBe('WHITE')
+    }
+  })
+
+  it('should reject invalid moves during restoration', async () => {
+    // Use an illegal move to test validation
+    const invalidMoves = [
+      {
+        moveNumber: 1,
+        color: 'BLACK' as const,
+        row: 0 as const,
+        col: 0 as const,
+        isPass: false,
+      },
+    ]
+
+    vi.mocked(deviceLocalStorage.loadGameFromDeviceLocal).mockReturnValue({
+      success: true,
+      record: {
+        formatVersion: 1,
+        moves: invalidMoves,
+      },
+    })
+
+    const result = await initializeGame()
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Invalid game record')
+      expect(result.error).toContain('Move 1')
+    }
+  })
+
+  it('should reject invalid pass moves during restoration', async () => {
+    // Use a pass move when legal moves are available
+    const invalidPassMoves = [
+      {
+        moveNumber: 1,
+        color: 'BLACK' as const,
+        row: null,
+        col: null,
+        isPass: true,
+      },
+    ]
+
+    vi.mocked(deviceLocalStorage.loadGameFromDeviceLocal).mockReturnValue({
+      success: true,
+      record: {
+        formatVersion: 1,
+        moves: invalidPassMoves,
+      },
+    })
+
+    const result = await initializeGame()
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Invalid game record')
+      expect(result.error).toContain('Pass move invalid')
+    }
+  })
+
+  it('should reject turn inconsistency during restoration', async () => {
+    // Use WHITE move when BLACK should move first
+    const turnInconsistentMoves = [
+      {
+        moveNumber: 1,
+        color: 'WHITE' as const,
+        row: 2 as const,
+        col: 3 as const,
+        isPass: false,
+      },
+    ]
+
+    vi.mocked(deviceLocalStorage.loadGameFromDeviceLocal).mockReturnValue({
+      success: true,
+      record: {
+        formatVersion: 1,
+        moves: turnInconsistentMoves,
+      },
+    })
+
+    const result = await initializeGame()
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Invalid game record')
+      expect(result.error).toContain('Expected BLACK')
     }
   })
 
