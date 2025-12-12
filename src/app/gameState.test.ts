@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { initializeGame } from './gameState'
 import { createInitialBoard } from '../domain/rules'
 import * as deviceLocalStorage from '../storage/deviceLocalStorage'
+import type { Move } from '../domain/types'
 
 vi.mock('../storage/deviceLocalStorage')
 
@@ -179,5 +180,79 @@ describe('initializeGame', () => {
     if (!result.success) {
       expect(result.error).toContain('format')
     }
+  })
+})
+
+describe('placeStone', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should place stone on legal move and update game state', async () => {
+    const { placeStone } = await import('./gameState')
+    const initialBoard = createInitialBoard()
+    const gameState = {
+      board: initialBoard,
+      nextTurnColor: 'BLACK' as const,
+      isFinished: false,
+    }
+    const moves: readonly Move[] = []
+
+    // Mock save function
+    vi.mocked(deviceLocalStorage.saveGameToDeviceLocal).mockReturnValue({
+      success: true,
+      data: undefined,
+    })
+
+    const result = await placeStone(gameState, moves, 2, 3)
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.newGameState.nextTurnColor).toBe('WHITE')
+      expect(result.newMoves.length).toBe(1)
+      expect(result.newMoves[0].color).toBe('BLACK')
+      expect(result.newMoves[0].row).toBe(2)
+      expect(result.newMoves[0].col).toBe(3)
+      expect(result.newMoves[0].isPass).toBe(false)
+    }
+  })
+
+  it('should reject illegal move', async () => {
+    const { placeStone } = await import('./gameState')
+    const initialBoard = createInitialBoard()
+    const gameState = {
+      board: initialBoard,
+      nextTurnColor: 'BLACK' as const,
+      isFinished: false,
+    }
+    const moves: readonly Move[] = []
+
+    const result = await placeStone(gameState, moves, 0, 0)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Illegal')
+    }
+  })
+
+  it('should save game to DeviceLocal after successful move', async () => {
+    const { placeStone } = await import('./gameState')
+    const initialBoard = createInitialBoard()
+    const gameState = {
+      board: initialBoard,
+      nextTurnColor: 'BLACK' as const,
+      isFinished: false,
+    }
+    const moves: readonly Move[] = []
+
+    vi.mocked(deviceLocalStorage.saveGameToDeviceLocal).mockReturnValue({
+      success: true,
+      data: undefined,
+    })
+
+    const result = await placeStone(gameState, moves, 2, 3)
+
+    expect(result.success).toBe(true)
+    expect(deviceLocalStorage.saveGameToDeviceLocal).toHaveBeenCalledTimes(1)
   })
 })
