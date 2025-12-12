@@ -13,6 +13,8 @@ import {
   startNewGame,
   exportRecordToClipboard,
   exportRecordToFile,
+  prepareImportRecordFromClipboard,
+  importRecord,
   type AppState,
 } from './app/gameState'
 import { Board } from './components/Board'
@@ -20,6 +22,12 @@ import { RecordSidebar } from './components/RecordSidebar'
 
 function App() {
   const [appState, setAppState] = useState<AppState>({ type: 'LOADING' })
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const statusMessageElement = statusMessage ? (
+    <p className="status-message" role="status">
+      {statusMessage}
+    </p>
+  ) : null
 
   useEffect(() => {
     // R1: Initialize game on app launch
@@ -127,6 +135,7 @@ function App() {
     }
 
     const handleNewGameClick = () => {
+      setStatusMessage(null)
       // R1: STATE_PLAYING から New Game 操作ができる
       setAppState({
         type: 'NEW_GAME_CONFIRM',
@@ -137,6 +146,7 @@ function App() {
     }
 
     const handleExportClick = () => {
+      setStatusMessage(null)
       // R1: STATE_PLAYING から Export 操作ができる
       setAppState({
         type: 'EXPORTING',
@@ -146,12 +156,34 @@ function App() {
       })
     }
 
+    const handleImportClick = async () => {
+      if (appState.type !== 'PLAYING') {
+        return
+      }
+      const currentState = appState
+      setStatusMessage(null)
+      const result = await prepareImportRecordFromClipboard()
+      if (!result.success) {
+        setStatusMessage(result.error)
+        return
+      }
+
+      setAppState({
+        type: 'IMPORT_CONFIRM',
+        previousGameState: currentState.gameState,
+        previousMoves: currentState.moves,
+        pendingImport: result.preview,
+      })
+    }
+
     return (
       <div className="app-playing">
         <h1>Othello</h1>
+        {statusMessageElement}
         <div>
           <button onClick={handleNewGameClick}>New Game</button>
           <button onClick={handleExportClick}>Export</button>
+          <button onClick={handleImportClick}>Import (Clipboard)</button>
         </div>
         <div className="game-container">
           <div className="board-container">
@@ -169,6 +201,7 @@ function App() {
 
   if (appState.type === 'RESULT') {
     const handleNewGameClick = () => {
+      setStatusMessage(null)
       // R1: STATE_RESULT から New Game 操作ができる
       setAppState({
         type: 'NEW_GAME_CONFIRM',
@@ -179,6 +212,7 @@ function App() {
     }
 
     const handleExportClick = () => {
+      setStatusMessage(null)
       // R1: STATE_RESULT から Export 操作ができる
       setAppState({
         type: 'EXPORTING',
@@ -191,6 +225,7 @@ function App() {
     return (
       <div>
         <h1>Othello</h1>
+        {statusMessageElement}
         <p>Game finished.</p>
         <div>
           <button onClick={handleNewGameClick}>New Game</button>
@@ -241,11 +276,97 @@ function App() {
     return (
       <div>
         <h1>Othello</h1>
+        {statusMessageElement}
         <div>
           <h2>Start New Game</h2>
           <p>Current game will be abandoned. Are you sure?</p>
           <button onClick={handleConfirm}>Confirm</button>
           <button onClick={handleCancel}>Cancel</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (appState.type === 'IMPORT_CONFIRM') {
+    const { pendingImport, previousGameState, previousMoves } = appState
+    const lastMove =
+      pendingImport.moves.length === 0
+        ? null
+        : pendingImport.moves[pendingImport.moves.length - 1]
+    const lastMoveLabel = lastMove
+      ? lastMove.isPass
+        ? `${lastMove.moveNumber}. ${lastMove.color} Pass`
+        : `${lastMove.moveNumber}. ${lastMove.color} (${lastMove.row}, ${lastMove.col})`
+      : 'No moves yet'
+
+    const handleImportConfirm = async () => {
+      setStatusMessage(null)
+      setAppState({
+        type: 'IMPORTING',
+        previousGameState,
+        previousMoves,
+        pendingImport,
+      })
+
+      const result = await importRecord(
+        pendingImport.moves,
+        pendingImport.previewGameState
+      )
+
+      if (result.success) {
+        setAppState({
+          type: 'PLAYING',
+          gameState: result.gameState,
+          moves: result.moves,
+        })
+        setStatusMessage('Record imported successfully.')
+      } else {
+        setStatusMessage(result.error)
+        setAppState({
+          type: 'PLAYING',
+          gameState: previousGameState,
+          moves: previousMoves,
+        })
+      }
+    }
+
+    const handleImportCancel = () => {
+      setAppState({
+        type: 'PLAYING',
+        gameState: appState.previousGameState,
+        moves: appState.previousMoves,
+      })
+    }
+
+    return (
+      <div>
+        <h1>Othello</h1>
+        {statusMessageElement}
+        <div>
+          <h2>Import Record</h2>
+          <p>Moves: {pendingImport.moves.length}</p>
+          <p>Last move: {lastMoveLabel}</p>
+          <p>Next turn: {pendingImport.previewGameState.nextTurnColor}</p>
+          <p>
+            Game finished:{' '}
+            {pendingImport.previewGameState.isFinished ? 'Yes' : 'No'}
+          </p>
+          <p>Record size: {pendingImport.recordSizeBytes} bytes</p>
+          <button onClick={handleImportConfirm}>Confirm</button>
+          <button onClick={handleImportCancel}>Cancel</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (appState.type === 'IMPORTING') {
+    return (
+      <div>
+        <h1>Othello</h1>
+        {statusMessageElement}
+        <div>
+          <h2>Importing Record</h2>
+          <p>Please wait while the record is being saved.</p>
         </div>
       </div>
     )
@@ -328,6 +449,7 @@ function App() {
     return (
       <div>
         <h1>Othello</h1>
+        {statusMessageElement}
         <div>
           <h2>Export Record</h2>
           <p>Choose export destination:</p>

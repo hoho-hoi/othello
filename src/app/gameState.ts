@@ -7,6 +7,7 @@
 import {
   loadGameFromDeviceLocal,
   saveGameToDeviceLocal,
+  MAX_RECORD_JSON_SIZE,
 } from '../storage/deviceLocalStorage'
 import {
   createInitialBoard,
@@ -16,9 +17,10 @@ import {
 } from '../domain/rules'
 import {
   serializeRecordFormat,
+  parseRecordFormat,
   type RecordFormat,
 } from '../storage/recordFormat'
-import type { GameState, Move, PieceColor } from '../domain/types'
+import type { Board, GameState, Move, PieceColor } from '../domain/types'
 
 /**
  * Application state
@@ -48,6 +50,56 @@ export type AppState =
       readonly gameState: GameState
       readonly moves: readonly Move[]
     }
+  | {
+      readonly type: 'IMPORT_CONFIRM'
+      readonly previousGameState: GameState
+      readonly previousMoves: readonly Move[]
+      readonly pendingImport: ImportPreview
+    }
+  | {
+      readonly type: 'IMPORTING'
+      readonly previousGameState: GameState
+      readonly previousMoves: readonly Move[]
+      readonly pendingImport: ImportPreview
+    }
+
+/**
+ * Determine next turn color after applying a sequence of moves.
+ */
+function deriveNextTurnColor(moves: readonly Move[]): PieceColor {
+  if (moves.length === 0) {
+    return 'BLACK'
+  }
+  const lastMove = moves[moves.length - 1]
+  return lastMove.color === 'BLACK' ? 'WHITE' : 'BLACK'
+}
+
+/**
+ * Determine previous turn color (last move owner or WHITE before any move).
+ */
+function derivePreviousTurnColor(moves: readonly Move[]): PieceColor {
+  if (moves.length === 0) {
+    return 'WHITE'
+  }
+  return moves[moves.length - 1].color
+}
+
+/**
+ * Build GameState from a recomputed board and the original moves.
+ */
+function createGameStateFromBoard(
+  board: Board,
+  moves: readonly Move[]
+): GameState {
+  const nextTurnColor = deriveNextTurnColor(moves)
+  const previousTurnColor = derivePreviousTurnColor(moves)
+  const isFinished = isGameFinished(board, nextTurnColor, previousTurnColor)
+  return {
+    board,
+    nextTurnColor,
+    isFinished,
+  }
+}
 
 /**
  * Game initialization result
@@ -79,11 +131,7 @@ export async function initializeGame(): Promise<GameInitializationResult> {
   // If no saved game exists, create new game
   if (loadResult.record === null) {
     const initialBoard = createInitialBoard()
-    const gameState: GameState = {
-      board: initialBoard,
-      nextTurnColor: 'BLACK',
-      isFinished: false,
-    }
+    const gameState = createGameStateFromBoard(initialBoard, [])
     return {
       success: true,
       gameState,
@@ -104,27 +152,8 @@ export async function initializeGame(): Promise<GameInitializationResult> {
       error: `Invalid game record: ${recomputeResult.error}`,
     }
   }
-  const board = recomputeResult.board
 
-  // Determine next turn color
-  // After applying all moves, next turn should be opposite of last move color
-  let nextTurnColor: PieceColor = 'BLACK'
-  if (moves.length > 0) {
-    const lastMove = moves[moves.length - 1]
-    nextTurnColor = lastMove.color === 'BLACK' ? 'WHITE' : 'BLACK'
-  }
-
-  // Check if game is finished
-  // We need previous turn color to check finish condition
-  const previousTurnColor: PieceColor =
-    moves.length > 0 ? moves[moves.length - 1].color : 'WHITE' // If no moves, previous was WHITE (before BLACK starts)
-  const isFinished = isGameFinished(board, nextTurnColor, previousTurnColor)
-
-  const gameState: GameState = {
-    board,
-    nextTurnColor,
-    isFinished,
-  }
+  const gameState = createGameStateFromBoard(recomputeResult.board, moves)
 
   return {
     success: true,
@@ -227,11 +256,7 @@ export async function placeStone(
 export async function startNewGame(): Promise<GameInitializationResult> {
   // Create new game with initial board
   const initialBoard = createInitialBoard()
-  const gameState: GameState = {
-    board: initialBoard,
-    nextTurnColor: 'BLACK',
-    isFinished: false,
-  }
+  const gameState = createGameStateFromBoard(initialBoard, [])
 
   // R4: Save to DeviceLocal storage
   const saveResult = saveGameToDeviceLocal([])
@@ -246,6 +271,122 @@ export async function startNewGame(): Promise<GameInitializationResult> {
     success: true,
     gameState,
     moves: [],
+  }
+}
+
+export interface ImportPreview {
+  readonly moves: readonly Move[]
+  readonly previewGameState: GameState
+  readonly recordSizeBytes: number
+}
+
+export type PrepareImportResult =
+  | { readonly success: true; readonly preview: ImportPreview }
+  | { readonly success: false; readonly error: string }
+
+/**
+ * Prepare import record (clipboard) by performing staged validation.
+ *
+ * 1. JSON parse + schema validation (via parseRecordFormat)
+ * 2. Rule consistency check (recomputeBoardFromMovesValidated)
+ * 3. Build GameState for preview
+ */
+export async function prepareImportRecordFromClipboard(): Promise<PrepareImportResult> {
+  if (
+    typeof navigator === 'undefined' ||
+    !navigator.clipboard ||
+    typeof navigator.clipboard.readText !== 'function'
+  ) {
+    return {
+      success: false,
+      error: 'Clipboard API is unavailable',
+    }
+  }
+
+  try {
+    const clipboardText = await navigator.clipboard.readText()
+
+    if (clipboardText.length > MAX_RECORD_JSON_SIZE) {
+      return {
+        success: false,
+        error: `Record size exceeds limit: ${clipboardText.length} bytes > ${MAX_RECORD_JSON_SIZE} bytes`,
+      }
+    }
+
+    const parseResult = parseRecordFormat(clipboardText)
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: `Record validation failed: ${parseResult.error}`,
+      }
+    }
+
+    if (!parseResult.record) {
+      return {
+        success: false,
+        error: 'Record parsing produced no data',
+      }
+    }
+
+    const moves = parseResult.record.moves
+    const recomputeResult = recomputeBoardFromMovesValidated(moves)
+    if (!recomputeResult.success) {
+      return {
+        success: false,
+        error: `Rule validation failed: ${recomputeResult.error}`,
+      }
+    }
+
+    const previewGameState = createGameStateFromBoard(
+      recomputeResult.board,
+      moves
+    )
+
+    return {
+      success: true,
+      preview: {
+        moves,
+        previewGameState,
+        recordSizeBytes: clipboardText.length,
+      },
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : String(error ?? 'Unknown error')
+    return {
+      success: false,
+      error: `Clipboard read error: ${message}`,
+    }
+  }
+}
+
+export type ImportRecordResult =
+  | {
+      readonly success: true
+      readonly gameState: GameState
+      readonly moves: readonly Move[]
+    }
+  | { readonly success: false; readonly error: string }
+
+/**
+ * Persist imported moves (OP_IMPORT_RECORD_FROM_CLIPBOARD).
+ */
+export async function importRecord(
+  moves: readonly Move[],
+  previewGameState: GameState
+): Promise<ImportRecordResult> {
+  const saveResult = saveGameToDeviceLocal(moves)
+  if (!saveResult.success) {
+    return {
+      success: false,
+      error: `Failed to save imported record: ${saveResult.error}`,
+    }
+  }
+
+  return {
+    success: true,
+    gameState: previewGameState,
+    moves,
   }
 }
 
