@@ -2,7 +2,7 @@
  * Tests for game state management and initialization
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { initializeGame } from './gameState'
 import { createInitialBoard } from '../domain/rules'
 import * as deviceLocalStorage from '../storage/deviceLocalStorage'
@@ -297,6 +297,148 @@ describe('startNewGame', () => {
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(result.error).toContain('Storage quota exceeded')
+    }
+  })
+})
+
+describe('exportRecordToClipboard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Mock navigator.clipboard
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+      writable: true,
+      configurable: true,
+    })
+  })
+
+  it('should export record to clipboard successfully', async () => {
+    const { exportRecordToClipboard } = await import('./gameState')
+    const moves: readonly Move[] = [
+      {
+        moveNumber: 1,
+        color: 'BLACK',
+        row: 2,
+        col: 3,
+        isPass: false,
+      },
+    ]
+
+    const result = await exportRecordToClipboard(moves)
+
+    expect(result.success).toBe(true)
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1)
+    const writtenText = vi.mocked(navigator.clipboard.writeText).mock
+      .calls[0][0]
+    const parsed = JSON.parse(writtenText)
+    expect(parsed.formatVersion).toBe(1)
+    expect(parsed.moves).toEqual(moves)
+  })
+
+  it('should handle clipboard permission denied error', async () => {
+    const { exportRecordToClipboard } = await import('./gameState')
+    const moves: readonly Move[] = []
+
+    vi.mocked(navigator.clipboard.writeText).mockRejectedValue(
+      new DOMException('Permission denied', 'NotAllowedError')
+    )
+
+    const result = await exportRecordToClipboard(moves)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Permission denied')
+    }
+  })
+
+  it('should handle clipboard write failure', async () => {
+    const { exportRecordToClipboard } = await import('./gameState')
+    const moves: readonly Move[] = []
+
+    vi.mocked(navigator.clipboard.writeText).mockRejectedValue(
+      new Error('Clipboard write failed')
+    )
+
+    const result = await exportRecordToClipboard(moves)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Clipboard write failed')
+    }
+  })
+})
+
+describe('exportRecordToFile', () => {
+  let originalCreateElement: typeof document.createElement
+  let mockLink: HTMLAnchorElement
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Mock URL.createObjectURL and URL.revokeObjectURL
+    globalThis.URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-url')
+    globalThis.URL.revokeObjectURL = vi.fn()
+    // Mock document.createElement for anchor elements only
+    originalCreateElement = document.createElement
+    mockLink = {
+      href: '',
+      download: '',
+      click: vi.fn(),
+    } as unknown as HTMLAnchorElement
+    globalThis.document.createElement = vi.fn((tagName: string) => {
+      if (tagName === 'a') {
+        return mockLink
+      }
+      return originalCreateElement.call(document, tagName)
+    }) as typeof document.createElement
+    globalThis.document.body.appendChild = vi.fn()
+    globalThis.document.body.removeChild = vi.fn()
+  })
+
+  afterEach(() => {
+    globalThis.document.createElement = originalCreateElement
+  })
+
+  it('should export record to file successfully', async () => {
+    const { exportRecordToFile } = await import('./gameState')
+    const moves: readonly Move[] = [
+      {
+        moveNumber: 1,
+        color: 'BLACK',
+        row: 2,
+        col: 3,
+        isPass: false,
+      },
+    ]
+
+    const result = await exportRecordToFile(moves)
+
+    expect(result.success).toBe(true)
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+    const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob
+    expect(blob.type).toBe('application/json')
+    // Verify blob content by checking the call
+    expect(mockLink.download).toBe('othello-record.json')
+    expect(mockLink.click).toHaveBeenCalledTimes(1)
+    expect(document.body.appendChild).toHaveBeenCalledWith(mockLink)
+    expect(document.body.removeChild).toHaveBeenCalledWith(mockLink)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
+  })
+
+  it('should handle file download failure', async () => {
+    const { exportRecordToFile } = await import('./gameState')
+    const moves: readonly Move[] = []
+
+    vi.mocked(URL.createObjectURL).mockImplementation(() => {
+      throw new Error('Failed to create object URL')
+    })
+
+    const result = await exportRecordToFile(moves)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('Failed to create object URL')
     }
   })
 })

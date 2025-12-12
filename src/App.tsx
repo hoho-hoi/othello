@@ -11,6 +11,8 @@ import {
   initializeGame,
   placeStone,
   startNewGame,
+  exportRecordToClipboard,
+  exportRecordToFile,
   type AppState,
 } from './app/gameState'
 import { Board } from './components/Board'
@@ -134,10 +136,23 @@ function App() {
       })
     }
 
+    const handleExportClick = () => {
+      // R1: STATE_PLAYING から Export 操作ができる
+      setAppState({
+        type: 'EXPORTING',
+        originState: 'PLAYING',
+        gameState: appState.gameState,
+        moves: appState.moves,
+      })
+    }
+
     return (
       <div className="app-playing">
         <h1>Othello</h1>
-        <button onClick={handleNewGameClick}>New Game</button>
+        <div>
+          <button onClick={handleNewGameClick}>New Game</button>
+          <button onClick={handleExportClick}>Export</button>
+        </div>
         <div className="game-container">
           <div className="board-container">
             <p>Next turn: {appState.gameState.nextTurnColor}</p>
@@ -163,11 +178,24 @@ function App() {
       })
     }
 
+    const handleExportClick = () => {
+      // R1: STATE_RESULT から Export 操作ができる
+      setAppState({
+        type: 'EXPORTING',
+        originState: 'RESULT',
+        gameState: appState.gameState,
+        moves: appState.moves,
+      })
+    }
+
     return (
       <div>
         <h1>Othello</h1>
         <p>Game finished.</p>
-        <button onClick={handleNewGameClick}>New Game</button>
+        <div>
+          <button onClick={handleNewGameClick}>New Game</button>
+          <button onClick={handleExportClick}>Export</button>
+        </div>
       </div>
     )
   }
@@ -217,6 +245,94 @@ function App() {
           <h2>Start New Game</h2>
           <p>Current game will be abandoned. Are you sure?</p>
           <button onClick={handleConfirm}>Confirm</button>
+          <button onClick={handleCancel}>Cancel</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (appState.type === 'EXPORTING') {
+    const handleExportToClipboard = async () => {
+      // R2: Export 先として Clipboard を提供する
+      const result = await exportRecordToClipboard(appState.moves)
+
+      if (result.success) {
+        // R4: Export 成功時は「起点の状態」に戻る
+        if (appState.originState === 'PLAYING') {
+          setAppState({
+            type: 'PLAYING',
+            gameState: appState.gameState,
+            moves: appState.moves,
+          })
+        } else {
+          setAppState({
+            type: 'RESULT',
+            gameState: appState.gameState,
+            moves: appState.moves,
+          })
+        }
+      } else {
+        // R5: 失敗時はクラッシュせず、ユーザに分かる形でエラーを提示する
+        setAppState({
+          type: 'ERROR',
+          error: result.error,
+        })
+      }
+    }
+
+    const handleExportToFile = async () => {
+      // R2: Export 先として File（download）を提供する
+      const result = await exportRecordToFile(appState.moves)
+
+      if (result.success) {
+        // R4: Export 成功時は「起点の状態」に戻る
+        if (appState.originState === 'PLAYING') {
+          setAppState({
+            type: 'PLAYING',
+            gameState: appState.gameState,
+            moves: appState.moves,
+          })
+        } else {
+          setAppState({
+            type: 'RESULT',
+            gameState: appState.gameState,
+            moves: appState.moves,
+          })
+        }
+      } else {
+        // R5: 失敗時はクラッシュせず、ユーザに分かる形でエラーを提示する
+        setAppState({
+          type: 'ERROR',
+          error: result.error,
+        })
+      }
+    }
+
+    const handleCancel = () => {
+      // Cancel: return to origin state
+      if (appState.originState === 'PLAYING') {
+        setAppState({
+          type: 'PLAYING',
+          gameState: appState.gameState,
+          moves: appState.moves,
+        })
+      } else {
+        setAppState({
+          type: 'RESULT',
+          gameState: appState.gameState,
+          moves: appState.moves,
+        })
+      }
+    }
+
+    return (
+      <div>
+        <h1>Othello</h1>
+        <div>
+          <h2>Export Record</h2>
+          <p>Choose export destination:</p>
+          <button onClick={handleExportToClipboard}>Copy to Clipboard</button>
+          <button onClick={handleExportToFile}>Download as File</button>
           <button onClick={handleCancel}>Cancel</button>
         </div>
       </div>
