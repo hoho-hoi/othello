@@ -36,7 +36,8 @@ flowchart TD
 
   STATE_PLAYING -->|export_clicked| STATE_EXPORTING
   STATE_RESULT -->|export_clicked| STATE_EXPORTING
-  STATE_EXPORTING["STATE_EXPORTING<br/>Generate JSON + copy/download"] -->|export_succeeded| STATE_PLAYING
+  STATE_EXPORTING["STATE_EXPORTING<br/>Generate JSON + copy/download"] -->|export_succeeded [origin=STATE_PLAYING]| STATE_PLAYING
+  STATE_EXPORTING -->|export_succeeded [origin=STATE_RESULT]| STATE_RESULT
   STATE_EXPORTING -->|export_failed| STATE_ERROR
 
   STATE_PLAYING -->|new_game_clicked| STATE_NEW_GAME_CONFIRM

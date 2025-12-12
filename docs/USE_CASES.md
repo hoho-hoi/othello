@@ -90,7 +90,9 @@ UMLの Fully Dressed Use Case を簡略化し、Domain / State / Operations と
 - Postcondition:
   - エクスポートされたJSONがユーザの操作した媒体（ファイル or クリップボード）に出力される
 
-- States: [STATE_PLAYING -> STATE_EXPORTING -> STATE_PLAYING]
+- States:
+  - [STATE_PLAYING -> STATE_EXPORTING -> STATE_PLAYING]
+  - [STATE_RESULT -> STATE_EXPORTING -> STATE_RESULT]
 
 - Operations: [OP_EXPORT_RECORD_TO_FILE, OP_EXPORT_RECORD_TO_CLIPBOARD]
 
@@ -172,3 +174,4 @@ Validation Rules:
   - when `isPass=true`: both must be null.
 - Import behavior:
   - After validation, overwrite current game and recompute board state from moves + rules.
+  - Transactional overwrite: never destroy current game on validation failure.
