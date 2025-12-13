@@ -113,7 +113,24 @@ ER 図だけでは表現しづらいルールや補足がある場合に記述�
 
 - Interaction State Diagram: see `INTERACTION_FLOW.md`  
 
-### 3.2 Public Operations / APIs
+### 3.2 Error Handling Policy (statusMessage / STATE_ERROR)
+
+<!--
+エラー処理の方針を明確にする。
+statusMessage と STATE_ERROR の使い分けを定義する。
+-->
+
+- **statusMessage**:  
+  - 各状態で表示可能な一時的なメッセージ（エラー/情報）を表す。  
+  - エラー発生時、STATE_ERROR への遷移は行わず、statusMessage でエラーを表示し、元の状態を維持する。  
+  - 例: 不正手の着手試行、インポートバリデーション失敗、ストレージ保存失敗など。  
+  - アクセシビリティ対応: `aria-live="polite"` でスクリーンリーダーに通知される。  
+- **STATE_ERROR**:  
+  - アプリ起動時の初期化失敗など、回復不可能なエラーのみに限定される。  
+  - 例: DeviceLocal からのゲーム復元失敗、新規ゲーム生成失敗など。  
+  - ユーザは「再試行」ボタンで STATE_LOADING に戻り、初期化を再実行できる。
+
+### 3.3 Public Operations / APIs
 
 <!--
 クライアント(人間・他システム・外部アプリ等)から見える操作/インターフェースを列挙する。
@@ -132,7 +149,7 @@ Web の場合は HTTP パス、CLI の場合はコマンド、ゲーム/組み�
 | OP_EXPORT_RECORD_TO_FILE | UI / Export File | 現在対局の棋譜（独自JSON）をファイルとして書き出す |
 | OP_EXPORT_RECORD_TO_CLIPBOARD | UI / Copy JSON | 現在対局の棋譜（独自JSON）をクリップボードへコピーする |
 
-### 3.3 Use Cases
+### 3.4 Use Cases
 
 <!--
 ユースケースの詳細仕様は USE_CASES.md に記述する。
