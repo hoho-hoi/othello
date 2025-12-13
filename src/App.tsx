@@ -207,7 +207,8 @@ function App() {
               }
             } else {
               // Pass failed (shouldn't happen if canPass was true)
-              console.error('Auto-pass failed:', passResult.error)
+              // R2: パス失敗時もstatusMessageでエラーを表示
+              setStatusMessage(passResult.error)
               setAppState({
                 type: 'PLAYING',
                 gameState: result.newGameState,
@@ -224,10 +225,8 @@ function App() {
           }
         }
       } else {
-        // R3: 不正手の場合、エラーを表示（クラッシュしない）
-        // For now, we silently ignore invalid moves
-        // In a production app, we might show a toast notification
-        console.warn('Invalid move:', result.error)
+        // R1: 不正手の場合、statusMessageでエラーを表示（クラッシュしない）
+        setStatusMessage(result.error)
       }
     }
 
@@ -418,11 +417,9 @@ function App() {
           moves: result.moves,
         })
       } else {
-        // R4: DeviceLocal 保存失敗時はクラッシュせず、ユーザに分かる形でエラーを提示する
-        setAppState({
-          type: 'ERROR',
-          error: result.error,
-        })
+        // R3: DeviceLocal 保存失敗時はstatusMessageでエラーを提示（統一されたエラー表示）
+        setStatusMessage(result.error)
+        // 元の状態に戻る（NEW_GAME_CONFIRM状態を維持）
       }
     }
 
@@ -563,11 +560,22 @@ function App() {
           })
         }
       } else {
-        // R5: 失敗時はクラッシュせず、ユーザに分かる形でエラーを提示する
-        setAppState({
-          type: 'ERROR',
-          error: result.error,
-        })
+        // R3: 失敗時はstatusMessageでエラーを提示（統一されたエラー表示）
+        setStatusMessage(result.error)
+        // 元の状態に戻る（EXPORTING状態から元の状態へ）
+        if (appState.originState === 'PLAYING') {
+          setAppState({
+            type: 'PLAYING',
+            gameState: appState.gameState,
+            moves: appState.moves,
+          })
+        } else {
+          setAppState({
+            type: 'RESULT',
+            gameState: appState.gameState,
+            moves: appState.moves,
+          })
+        }
       }
     }
 
@@ -591,11 +599,22 @@ function App() {
           })
         }
       } else {
-        // R5: 失敗時はクラッシュせず、ユーザに分かる形でエラーを提示する
-        setAppState({
-          type: 'ERROR',
-          error: result.error,
-        })
+        // R3: 失敗時はstatusMessageでエラーを提示（統一されたエラー表示）
+        setStatusMessage(result.error)
+        // 元の状態に戻る（EXPORTING状態から元の状態へ）
+        if (appState.originState === 'PLAYING') {
+          setAppState({
+            type: 'PLAYING',
+            gameState: appState.gameState,
+            moves: appState.moves,
+          })
+        } else {
+          setAppState({
+            type: 'RESULT',
+            gameState: appState.gameState,
+            moves: appState.moves,
+          })
+        }
       }
     }
 
