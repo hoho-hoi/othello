@@ -175,6 +175,90 @@ describe('App', () => {
     expect(screen.getByTestId('board')).toBeInTheDocument()
   })
 
+  it('should display status message when invalid move is attempted (R1)', async () => {
+    const user = userEvent.setup()
+    const initialBoard = createInitialBoard()
+    vi.mocked(gameState.initializeGame).mockResolvedValue({
+      success: true,
+      gameState: {
+        board: initialBoard,
+        nextTurnColor: 'BLACK',
+        isFinished: false,
+      },
+      moves: [],
+    })
+
+    // Mock placeStone to return error (illegal move)
+    vi.mocked(gameState.placeStone).mockResolvedValue({
+      success: false,
+      error: 'Illegal move: no pieces can be flipped',
+    })
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+    })
+
+    // Click on a cell (illegal move position)
+    const board = screen.getByTestId('board')
+    const cells = board.querySelectorAll('button')
+    await user.click(cells[0] as HTMLElement)
+
+    // Should display error message in status message
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Illegal move: no pieces can be flipped/i)
+      ).toBeInTheDocument()
+    })
+
+    // App should still be in playing state
+    expect(screen.getByTestId('board')).toBeInTheDocument()
+  })
+
+  it('should display status message when DeviceLocal save fails after move (R2)', async () => {
+    const user = userEvent.setup()
+    const initialBoard = createInitialBoard()
+    vi.mocked(gameState.initializeGame).mockResolvedValue({
+      success: true,
+      gameState: {
+        board: initialBoard,
+        nextTurnColor: 'BLACK',
+        isFinished: false,
+      },
+      moves: [],
+    })
+
+    // Mock placeStone to return error due to save failure
+    vi.mocked(gameState.placeStone).mockResolvedValue({
+      success: false,
+      error: 'Move applied but save failed: Storage quota exceeded',
+    })
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+    })
+
+    // Click on a cell (legal move position)
+    const board = screen.getByTestId('board')
+    const cells = board.querySelectorAll('button')
+    await user.click(cells[0] as HTMLElement)
+
+    // Should display error message in status message
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          /Move applied but save failed: Storage quota exceeded/i
+        )
+      ).toBeInTheDocument()
+    })
+
+    // App should still be in playing state (state should not be corrupted)
+    expect(screen.getByTestId('board')).toBeInTheDocument()
+  })
+
   it('should show new game confirmation dialog when New Game button is clicked from PLAYING state', async () => {
     const user = userEvent.setup()
     const initialBoard = createInitialBoard()
@@ -339,11 +423,14 @@ describe('App', () => {
     const confirmButton = screen.getByRole('button', { name: /confirm/i })
     await user.click(confirmButton)
 
-    // Should show error message
+    // Should show error message in status message (R3: unified error display)
     await waitFor(() => {
-      expect(screen.getByText(/error/i)).toBeInTheDocument()
-      expect(screen.getByText(/storage quota exceeded/i)).toBeInTheDocument()
+      expect(screen.getByText(/Storage quota exceeded/i)).toBeInTheDocument()
     })
+
+    // Should stay in NEW_GAME_CONFIRM state or return to previous state
+    // (not ERROR state - R3: unified error display)
+    expect(screen.queryByText(/error/i)).not.toBeInTheDocument()
   })
 
   describe('Export functionality', () => {
@@ -567,11 +654,13 @@ describe('App', () => {
       })
       await user.click(clipboardButton)
 
-      // Should show error message
+      // Should show error message in status message (R3: unified error display)
       await waitFor(() => {
-        expect(screen.getByText(/error/i)).toBeInTheDocument()
-        expect(screen.getByText(/permission denied/i)).toBeInTheDocument()
+        expect(screen.getByText(/Permission denied/i)).toBeInTheDocument()
       })
+
+      // Should return to PLAYING state (not ERROR state)
+      expect(screen.getByTestId('board')).toBeInTheDocument()
     })
 
     it('should show error when file export fails', async () => {
@@ -609,13 +698,15 @@ describe('App', () => {
       })
       await user.click(fileButton)
 
-      // Should show error message
+      // Should show error message in status message (R3: unified error display)
       await waitFor(() => {
-        expect(screen.getByText(/error/i)).toBeInTheDocument()
         expect(
-          screen.getByText(/failed to create object url/i)
+          screen.getByText(/Failed to create object URL/i)
         ).toBeInTheDocument()
       })
+
+      // Should return to PLAYING state (not ERROR state)
+      expect(screen.getByTestId('board')).toBeInTheDocument()
     })
 
     it('should return to previous state when Cancel is clicked in export dialog', async () => {
