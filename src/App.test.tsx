@@ -3,9 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 import * as gameState from './app/gameState'
+import * as rules from './domain/rules'
 import { createInitialBoard } from './domain/rules'
 
 vi.mock('./app/gameState')
+vi.mock('./domain/rules', async () => {
+  const actual = await vi.importActual('./domain/rules')
+  return {
+    ...actual,
+    canPass: vi.fn(),
+  }
+})
 
 describe('App', () => {
   beforeEach(() => {
@@ -1194,6 +1202,153 @@ describe('App', () => {
         expect(screen.getByText(/Storage quota exceeded/i)).toBeInTheDocument()
         expect(screen.getByTestId('board')).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('Pass handling (R1, R5)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+    })
+
+    it('should show status message when auto-pass occurs in PLAYING state (R5)', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: [],
+      })
+
+      // Mock canPass to return true (no legal moves) for WHITE after BLACK's move
+      vi.mocked(rules.canPass).mockImplementation((_board, color) => {
+        // After BLACK moves, WHITE has no legal moves
+        return color === 'WHITE'
+      })
+
+      // Mock placeStone to return success
+      vi.mocked(gameState.placeStone).mockResolvedValue({
+        success: true,
+        newGameState: {
+          board: initialBoard,
+          nextTurnColor: 'WHITE',
+          isFinished: false,
+        },
+        newMoves: [
+          {
+            moveNumber: 1,
+            color: 'BLACK',
+            row: 2,
+            col: 3,
+            isPass: false,
+          },
+        ],
+      })
+
+      // Mock passTurn to return success (auto-pass for WHITE)
+      vi.mocked(gameState.passTurn).mockResolvedValue({
+        success: true,
+        newGameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        newMoves: [
+          {
+            moveNumber: 1,
+            color: 'BLACK',
+            row: 2,
+            col: 3,
+            isPass: false,
+          },
+          {
+            moveNumber: 2,
+            color: 'WHITE',
+            row: null,
+            col: null,
+            isPass: true,
+          },
+        ],
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Click on a cell to place a stone
+      const board = screen.getByTestId('board')
+      const cells = board.querySelectorAll('button')
+      await user.click(cells[0] as HTMLElement)
+
+      // Wait for auto-pass to occur and status message to appear
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(/WHITE passed \(no legal moves\)/i)
+          ).toBeInTheDocument()
+        },
+        { timeout: 3000 }
+      )
+
+      // Verify passTurn was called
+      expect(gameState.passTurn).toHaveBeenCalledTimes(1)
+    })
+
+    it('should show status message when auto-pass occurs on state transition (R5)', async () => {
+      const initialBoard = createInitialBoard()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'WHITE',
+          isFinished: false,
+        },
+        moves: [],
+      })
+
+      // Mock canPass to return true (no legal moves) for WHITE
+      vi.mocked(rules.canPass).mockImplementation((_board, color) => {
+        return color === 'WHITE'
+      })
+
+      // Mock passTurn to return success (auto-pass for WHITE)
+      vi.mocked(gameState.passTurn).mockResolvedValue({
+        success: true,
+        newGameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        newMoves: [
+          {
+            moveNumber: 1,
+            color: 'WHITE',
+            row: null,
+            col: null,
+            isPass: true,
+          },
+        ],
+      })
+
+      render(<App />)
+
+      // Wait for auto-pass to occur and status message to appear
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(/WHITE passed \(no legal moves\)/i)
+          ).toBeInTheDocument()
+        },
+        { timeout: 3000 }
+      )
+
+      // Verify passTurn was called
+      expect(gameState.passTurn).toHaveBeenCalledTimes(1)
     })
   })
 })

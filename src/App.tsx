@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   initializeGame,
   placeStone,
+  passTurn,
   startNewGame,
   exportRecordToClipboard,
   exportRecordToFile,
@@ -18,6 +19,7 @@ import {
   importRecord,
   type AppState,
 } from './app/gameState'
+import { canPass } from './domain/rules'
 import { Board } from './components/Board'
 import { RecordSidebar } from './components/RecordSidebar'
 
@@ -54,6 +56,54 @@ function App() {
 
     loadGame()
   }, [])
+
+  // R1: Auto-pass when current player has no legal moves in PLAYING state
+  useEffect(() => {
+    if (appState.type !== 'PLAYING') {
+      return
+    }
+
+    const currentState = appState
+    const checkAndAutoPass = async () => {
+      const currentPlayerCanPass = canPass(
+        currentState.gameState.board,
+        currentState.gameState.nextTurnColor
+      )
+
+      if (currentPlayerCanPass && !currentState.gameState.isFinished) {
+        // R1: Auto-pass for current player
+        const passResult = await passTurn(
+          currentState.gameState,
+          currentState.moves
+        )
+
+        if (passResult.success) {
+          // R5: Show pass message
+          setStatusMessage(
+            `${currentState.gameState.nextTurnColor} passed (no legal moves)`
+          )
+
+          if (passResult.newGameState.isFinished) {
+            // R4: Game finished after consecutive passes
+            setAppState({
+              type: 'RESULT',
+              gameState: passResult.newGameState,
+              moves: passResult.newMoves,
+            })
+          } else {
+            // Continue playing after pass
+            setAppState({
+              type: 'PLAYING',
+              gameState: passResult.newGameState,
+              moves: passResult.newMoves,
+            })
+          }
+        }
+      }
+    }
+
+    checkAndAutoPass()
+  }, [appState])
 
   // Render based on current state
   if (appState.type === 'LOADING') {
@@ -121,12 +171,57 @@ function App() {
             moves: result.newMoves,
           })
         } else {
-          // Continue playing
-          setAppState({
-            type: 'PLAYING',
-            gameState: result.newGameState,
-            moves: result.newMoves,
-          })
+          // R1: Check if next player has legal moves, auto-pass if not
+          const nextPlayerCanPass = canPass(
+            result.newGameState.board,
+            result.newGameState.nextTurnColor
+          )
+
+          if (nextPlayerCanPass) {
+            // R1: Auto-pass for next player
+            const passResult = await passTurn(
+              result.newGameState,
+              result.newMoves
+            )
+
+            if (passResult.success) {
+              // R5: Show pass message
+              setStatusMessage(
+                `${result.newGameState.nextTurnColor} passed (no legal moves)`
+              )
+
+              if (passResult.newGameState.isFinished) {
+                // R4: Game finished after consecutive passes
+                setAppState({
+                  type: 'RESULT',
+                  gameState: passResult.newGameState,
+                  moves: passResult.newMoves,
+                })
+              } else {
+                // Continue playing after pass
+                setAppState({
+                  type: 'PLAYING',
+                  gameState: passResult.newGameState,
+                  moves: passResult.newMoves,
+                })
+              }
+            } else {
+              // Pass failed (shouldn't happen if canPass was true)
+              console.error('Auto-pass failed:', passResult.error)
+              setAppState({
+                type: 'PLAYING',
+                gameState: result.newGameState,
+                moves: result.newMoves,
+              })
+            }
+          } else {
+            // Continue playing - next player has legal moves
+            setAppState({
+              type: 'PLAYING',
+              gameState: result.newGameState,
+              moves: result.newMoves,
+            })
+          }
         }
       } else {
         // R3: 不正手の場合、エラーを表示（クラッシュしない）

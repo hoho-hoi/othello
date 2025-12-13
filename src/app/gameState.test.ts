@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { initializeGame } from './gameState'
 import { createInitialBoard } from '../domain/rules'
 import * as deviceLocalStorage from '../storage/deviceLocalStorage'
-import type { Move } from '../domain/types'
+import type { Move, Board } from '../domain/types'
 
 vi.mock('../storage/deviceLocalStorage')
 
@@ -254,6 +254,169 @@ describe('placeStone', () => {
 
     expect(result.success).toBe(true)
     expect(deviceLocalStorage.saveGameToDeviceLocal).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('passTurn', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  /**
+   * Create a board where WHITE has no legal moves (all BLACK pieces)
+   * This is a deterministic board state that guarantees canPass(board, 'WHITE') === true
+   */
+  const createBoardWhereWhiteCannotMove = (): Board => {
+    return [
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+    ] as Board
+  }
+
+  /**
+   * Create a board where both players have no legal moves
+   * This is used for testing consecutive passes leading to game end
+   */
+  const createBoardWhereBothCannotMove = (): Board => {
+    // A board where all cells are BLACK except one empty cell
+    // Neither player can make a legal move from this position
+    return [
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK'],
+      ['BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', 'BLACK', null],
+    ] as Board
+  }
+
+  it('should reject pass when legal moves are available', async () => {
+    const { passTurn } = await import('./gameState')
+    const initialBoard = createInitialBoard()
+    const gameState = {
+      board: initialBoard,
+      nextTurnColor: 'BLACK' as const,
+      isFinished: false,
+    }
+    const moves: readonly Move[] = []
+
+    // Initial board has legal moves for BLACK, so pass should fail
+    const result = await passTurn(gameState, moves)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toContain('legal moves')
+    }
+  })
+
+  it('should pass successfully when no legal moves available (R1, R2, R3)', async () => {
+    const { passTurn } = await import('./gameState')
+    const { canPass } = await import('../domain/rules')
+    const board = createBoardWhereWhiteCannotMove()
+
+    // Verify WHITE has no legal moves (deterministic)
+    expect(canPass(board, 'WHITE')).toBe(true)
+
+    const gameState = {
+      board,
+      nextTurnColor: 'WHITE' as const,
+      isFinished: false,
+    }
+    const moves: readonly Move[] = [
+      {
+        moveNumber: 1,
+        color: 'BLACK' as const,
+        row: 2 as const,
+        col: 3 as const,
+        isPass: false,
+      },
+    ]
+
+    vi.mocked(deviceLocalStorage.saveGameToDeviceLocal).mockReturnValue({
+      success: true,
+      data: undefined,
+    })
+
+    const result = await passTurn(gameState, moves)
+
+    // R1: Pass should succeed
+    expect(result.success).toBe(true)
+    if (!result.success) {
+      throw new Error('Pass should succeed')
+    }
+
+    // R2: Pass move should be added to moves with correct format
+    expect(result.newMoves.length).toBe(2)
+    expect(result.newMoves[1].isPass).toBe(true)
+    expect(result.newMoves[1].row).toBe(null)
+    expect(result.newMoves[1].col).toBe(null)
+    expect(result.newMoves[1].color).toBe('WHITE')
+    expect(result.newMoves[1].moveNumber).toBe(2) // Sequential move number
+
+    // R3: Turn should switch
+    expect(result.newGameState.nextTurnColor).toBe('BLACK')
+
+    // R2/R5: Should save to DeviceLocal
+    expect(deviceLocalStorage.saveGameToDeviceLocal).toHaveBeenCalledTimes(1)
+    expect(deviceLocalStorage.saveGameToDeviceLocal).toHaveBeenCalledWith(
+      result.newMoves
+    )
+  })
+
+  it('should transition to finished state when both players must pass consecutively (R4)', async () => {
+    const { passTurn } = await import('./gameState')
+    const { canPass, isGameFinished } = await import('../domain/rules')
+    const board = createBoardWhereBothCannotMove()
+
+    // Verify both players have no legal moves
+    expect(canPass(board, 'WHITE')).toBe(true)
+    expect(canPass(board, 'BLACK')).toBe(true)
+
+    // Previous move was BLACK pass, now WHITE must pass
+    const moves: readonly Move[] = [
+      {
+        moveNumber: 1,
+        color: 'BLACK' as const,
+        row: null,
+        col: null,
+        isPass: true,
+      },
+    ]
+
+    const gameState = {
+      board,
+      nextTurnColor: 'WHITE' as const,
+      isFinished: false,
+    }
+
+    // Verify game should finish after this pass
+    expect(isGameFinished(board, 'WHITE', 'BLACK')).toBe(true)
+
+    vi.mocked(deviceLocalStorage.saveGameToDeviceLocal).mockReturnValue({
+      success: true,
+      data: undefined,
+    })
+
+    const result = await passTurn(gameState, moves)
+
+    // R4: Game should be finished after consecutive passes
+    expect(result.success).toBe(true)
+    if (!result.success) {
+      throw new Error('Pass should succeed')
+    }
+
+    expect(result.newGameState.isFinished).toBe(true)
+    expect(result.newMoves.length).toBe(2)
+    expect(result.newMoves[1].isPass).toBe(true)
+    expect(result.newMoves[1].color).toBe('WHITE')
   })
 })
 
