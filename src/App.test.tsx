@@ -1351,4 +1351,217 @@ describe('App', () => {
       expect(gameState.passTurn).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe('RESULT screen (Issue #19)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+    })
+
+    it('should display black and white stone counts when game finishes (R1)', async () => {
+      const initialBoard = createInitialBoard()
+      // Create a finished game state with known stone counts
+      const finishedBoard = createInitialBoard()
+      // Set up board with known counts: 10 black, 6 white
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          if (row < 4 || (row === 4 && col < 4)) {
+            finishedBoard[row][col] = 'BLACK'
+          } else if (row > 4 || (row === 4 && col >= 4)) {
+            finishedBoard[row][col] = 'WHITE'
+          }
+        }
+      }
+
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: [],
+      })
+
+      // Mock placeStone to transition to RESULT state with finished board
+      vi.mocked(gameState.placeStone).mockResolvedValue({
+        success: true,
+        newGameState: {
+          board: finishedBoard,
+          nextTurnColor: 'WHITE',
+          isFinished: true,
+        },
+        newMoves: [
+          {
+            moveNumber: 1,
+            color: 'BLACK',
+            row: 2,
+            col: 3,
+            isPass: false,
+          },
+        ],
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Make a move to finish the game
+      const board = screen.getByTestId('board')
+      const cells = board.querySelectorAll('button')
+      await userEvent.setup().click(cells[0] as HTMLElement)
+
+      // Wait for RESULT state
+      await waitFor(() => {
+        expect(screen.getByText(/Game finished/i)).toBeInTheDocument()
+      })
+
+      // Should display stone counts
+      // Note: We need to check for the actual counts computed by computeGameResult
+      // Since we're using the real computeGameResult function, we need to check for the actual result
+      const result = rules.computeGameResult(finishedBoard)
+      expect(
+        screen.getByText(new RegExp(`Black.*${result.blackCount}`, 'i'))
+      ).toBeInTheDocument()
+      expect(
+        screen.getByText(new RegExp(`White.*${result.whiteCount}`, 'i'))
+      ).toBeInTheDocument()
+    })
+
+    it('should display winner when game finishes (R2)', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      // Create a finished game state with BLACK winning
+      const finishedBoard = createInitialBoard()
+      // Set up board with BLACK winning (more black pieces)
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          if (row < 5) {
+            finishedBoard[row][col] = 'BLACK'
+          } else {
+            finishedBoard[row][col] = 'WHITE'
+          }
+        }
+      }
+
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: [],
+      })
+
+      // Mock placeStone to transition to RESULT state
+      vi.mocked(gameState.placeStone).mockResolvedValue({
+        success: true,
+        newGameState: {
+          board: finishedBoard,
+          nextTurnColor: 'WHITE',
+          isFinished: true,
+        },
+        newMoves: [
+          {
+            moveNumber: 1,
+            color: 'BLACK',
+            row: 2,
+            col: 3,
+            isPass: false,
+          },
+        ],
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Make a move to finish the game
+      const board = screen.getByTestId('board')
+      const cells = board.querySelectorAll('button')
+      await user.click(cells[0] as HTMLElement)
+
+      // Wait for RESULT state
+      await waitFor(() => {
+        expect(screen.getByText(/Game finished/i)).toBeInTheDocument()
+      })
+
+      // Should display winner
+      const result = rules.computeGameResult(finishedBoard)
+      if (result.winner === 'BLACK') {
+        expect(screen.getByText(/Black.*wins/i)).toBeInTheDocument()
+      } else if (result.winner === 'WHITE') {
+        expect(screen.getByText(/White.*wins/i)).toBeInTheDocument()
+      } else {
+        expect(screen.getByText(/Draw/i)).toBeInTheDocument()
+      }
+    })
+
+    it('should display RecordSidebar in RESULT state (R5)', async () => {
+      const user = userEvent.setup()
+      const initialBoard = createInitialBoard()
+      const moves = [
+        {
+          moveNumber: 1,
+          color: 'BLACK' as const,
+          row: 2 as const,
+          col: 3 as const,
+          isPass: false,
+        },
+        {
+          moveNumber: 2,
+          color: 'WHITE' as const,
+          row: 3 as const,
+          col: 2 as const,
+          isPass: false,
+        },
+      ]
+
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: [],
+      })
+
+      // Mock placeStone to transition to RESULT state
+      vi.mocked(gameState.placeStone).mockResolvedValue({
+        success: true,
+        newGameState: {
+          board: initialBoard,
+          nextTurnColor: 'WHITE',
+          isFinished: true,
+        },
+        newMoves: moves,
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Make a move to finish the game
+      const board = screen.getByTestId('board')
+      const cells = board.querySelectorAll('button')
+      await user.click(cells[0] as HTMLElement)
+
+      // Wait for RESULT state
+      await waitFor(() => {
+        expect(screen.getByText(/Game finished/i)).toBeInTheDocument()
+      })
+
+      // Should display RecordSidebar
+      expect(screen.getByTestId('record-sidebar')).toBeInTheDocument()
+      // Should display moves
+      expect(screen.getByText(/Record/i)).toBeInTheDocument()
+    })
+  })
 })
