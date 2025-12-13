@@ -10,6 +10,12 @@ import type { GameState, Position } from '../domain/types'
 interface BoardProps {
   readonly gameState: GameState
   readonly onCellClick: (row: number, col: number) => void
+  /**
+   * Legal moves for the current turn.
+   * - `undefined`: Legacy behavior (all cells are clickable)
+   * - `[]`: No legal moves (all cells are disabled)
+   * - `Position[]`: Only legal move cells are clickable
+   */
   readonly legalMoves?: readonly Position[]
 }
 
@@ -19,12 +25,15 @@ interface BoardProps {
 export function Board({
   gameState,
   onCellClick,
-  legalMoves = [],
+  legalMoves,
 }: BoardProps): JSX.Element {
+  // If legalMoves is undefined, use legacy behavior (all cells clickable)
+  const isLegacyMode = legalMoves === undefined
+
   // Create a Set for O(1) lookup of legal moves
-  const legalMoveSet = new Set(
-    legalMoves.map((move: Position) => `${move.row}-${move.col}`)
-  )
+  const legalMoveSet = isLegacyMode
+    ? new Set<string>()
+    : new Set(legalMoves.map((move: Position) => `${move.row}-${move.col}`))
 
   return (
     <div className="board" data-testid="board">
@@ -36,7 +45,8 @@ export function Board({
             const ariaLabel = `Row ${rowIndex} Col ${colIndex} ${cellState}`
             const cellKey = `${rowIndex}-${colIndex}`
             const isLegalMove = legalMoveSet.has(cellKey)
-            const isDisabled = !isLegalMove && legalMoves.length > 0
+            // Disable non-legal cells when legalMoves is provided (even if empty)
+            const isDisabled = !isLegacyMode && !isLegalMove
 
             // Build className: base class + legal move highlight if applicable
             const className = isLegalMove

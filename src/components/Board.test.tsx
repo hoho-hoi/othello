@@ -377,6 +377,38 @@ describe('Board', () => {
           expect(onCellClick).not.toHaveBeenCalled()
         }
       })
+
+      it('should disable all cells when legalMoves is empty array', async () => {
+        const user = userEvent.setup()
+        const gameState: GameState = {
+          board: createInitialBoard(),
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        }
+
+        const legalMoves: Position[] = []
+        const onCellClick = vi.fn()
+
+        render(
+          <Board
+            gameState={gameState}
+            onCellClick={onCellClick}
+            legalMoves={legalMoves}
+          />
+        )
+
+        // All cells should be disabled when legalMoves is empty
+        const cells = screen.getAllByRole('button')
+        cells.forEach((cell) => {
+          expect(cell).toBeDisabled()
+        })
+
+        // Try to click any cell
+        await user.click(cells[0] as HTMLElement)
+
+        // onCellClick should not be called for disabled cells
+        expect(onCellClick).not.toHaveBeenCalled()
+      })
     })
 
     describe('R3: Legal moves update immediately when turn changes', () => {

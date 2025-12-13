@@ -81,10 +81,13 @@ body {
 .board-cell-legal {
   background-color: #4a7b2f;
   box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.3);
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: -2px;
 }
 
 .board-cell-legal:hover {
   background-color: #5a8b3f;
+  outline-color: rgba(255, 255, 255, 0.8);
 }
 
 .board-cell:disabled {
