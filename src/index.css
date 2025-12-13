@@ -37,6 +37,15 @@ body {
   margin-top: 2rem;
 }
 
+/* Mobile layout: stack vertically on small screens */
+@media (max-width: 768px) {
+  .game-container {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+}
+
 .board-container {
   display: flex;
   flex-direction: column;
@@ -67,6 +76,15 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0;
+}
+
+/* Mobile: responsive cell size */
+@media (max-width: 768px) {
+  .board-cell {
+    width: 40px;
+    height: 40px;
+    font-size: 24px;
+  }
 }
 
 .board-cell:hover {
@@ -104,6 +122,14 @@ body {
   border-radius: 4px;
   background-color: #1a1a1a;
   text-align: left;
+}
+
+/* Mobile: full width sidebar */
+@media (max-width: 768px) {
+  .record-sidebar {
+    min-width: 100%;
+    max-width: 100%;
+  }
 }
 
 .record-sidebar h2 {

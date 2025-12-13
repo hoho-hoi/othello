@@ -1892,4 +1892,56 @@ describe('App', () => {
       })
     })
   })
+
+  describe('Mobile layout (Issue #34)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+    })
+
+    it('should render game-container with board and sidebar in playing state', async () => {
+      const initialBoard = createInitialBoard()
+      vi.mocked(gameState.initializeGame).mockResolvedValue({
+        success: true,
+        gameState: {
+          board: initialBoard,
+          nextTurnColor: 'BLACK',
+          isFinished: false,
+        },
+        moves: [],
+      })
+
+      render(<App />)
+
+      await waitFor(() => {
+        expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+      })
+
+      // Verify game-container exists with board and sidebar
+      const gameContainer = document.querySelector('.game-container')
+      expect(gameContainer).toBeInTheDocument()
+      expect(screen.getByTestId('board')).toBeInTheDocument()
+      expect(screen.getByTestId('record-sidebar')).toBeInTheDocument()
+    })
+
+    /**
+     * R3: Manual verification steps for mobile layout improvements
+     *
+     * To verify mobile layout improvements (Issue #34 R1):
+     * 1. Open the app in a browser (npm run dev)
+     * 2. Open browser DevTools and switch to mobile view (responsive design mode)
+     * 3. Set viewport width to 768px or less (e.g., iPhone SE: 375px)
+     * 4. Verify that:
+     *    - game-container displays board and sidebar vertically stacked (flex-direction: column)
+     *    - board cells are smaller (40px x 40px instead of 50px x 50px)
+     *    - sidebar takes full width (100% instead of min-width: 200px)
+     * 5. Resize viewport to larger than 768px and verify desktop layout is restored
+     *
+     * To verify performance improvements (Issue #34 R2):
+     * 1. Open browser DevTools Performance tab
+     * 2. Record a performance profile while interacting with the board
+     * 3. Verify that legalMoveSet is not recreated on every render
+     *    (check React DevTools Profiler for Board component re-renders)
+     * 4. Verify that legalMoves memoization in App.tsx prevents unnecessary recalculations
+     */
+  })
 })
