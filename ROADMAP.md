@@ -5,7 +5,6 @@
 - **Phase:** Phase 3 (Polish)  <!-- e.g., Phase 1 (Setup), Phase 2 (Implementation) -->
 - **Active Issues:**
   - #26 [DOCS] INTERACTION_FLOW の状態遷移を実装に合わせて更新（statusMessage方針）
-  - #27 [CHORE] ROADMAP.md を現状に更新（Phase/完了Issue/次マイルストーン）
 
 ## Milestones
 
@@ -27,6 +26,10 @@
 
 ### v0.2 (Documentation & Refinement)
 - [ ] Issue #26: [DOCS] INTERACTION_FLOW の状態遷移を実装に合わせて更新（statusMessage方針）
+- [ ] (TBD) [DOCS] USE_CASES のエラー方針を実装に合わせて更新
+- [ ] (TBD) [DOCS] REQUIREMENT の整合性確認と更新
+- [ ] (TBD) [CHORE] コード品質・テストカバレッジの改善
+- [ ] (TBD) [CHORE] パフォーマンス最適化とモバイル対応の強化
 
 ### Backlog (Refactoring & Future)
 <!-- When v0.1 is fully checked, the Manager must run a meta-review (see project-admin.mdc). -->
