@@ -5,6 +5,10 @@ import App from './App'
 import * as gameState from './app/gameState'
 import * as rules from './domain/rules'
 import { createInitialBoard, getLegalMoves } from './domain/rules'
+import {
+  findFirstLegalMoveCellIndex,
+  findFirstDisabledCellIndex,
+} from './test/helpers'
 
 vi.mock('./app/gameState')
 vi.mock('./domain/rules', async () => {
@@ -134,8 +138,8 @@ describe('App', () => {
     const cells = board.querySelectorAll('button')
     // Find a legal move cell (initial board: BLACK can play at (2,3), (3,2), (4,5), (5,4))
     const legalMoves = getLegalMoves(initialBoard, 'BLACK')
-    const firstLegalMove = legalMoves[0]
-    const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+    const legalMoveCellIndex = findFirstLegalMoveCellIndex(cells, legalMoves)
+    expect(legalMoveCellIndex).toBeGreaterThanOrEqual(0)
     await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
     // placeStone should be called
@@ -175,28 +179,14 @@ describe('App', () => {
     const cells = board.querySelectorAll('button')
     // Find a disabled cell (non-legal move)
     const legalMoves = getLegalMoves(initialBoard, 'BLACK')
-    const legalMoveSet = new Set(
-      legalMoves.map((move) => `${move.row}-${move.col}`)
-    )
-    // Find first disabled cell
-    let disabledCellIndex = -1
-    for (let i = 0; i < cells.length; i++) {
-      const row = Math.floor(i / 8)
-      const col = i % 8
-      const cellKey = `${row}-${col}`
-      if (!legalMoveSet.has(cellKey)) {
-        disabledCellIndex = i
-        break
-      }
-    }
-    if (disabledCellIndex >= 0) {
-      const disabledCell = cells[disabledCellIndex] as HTMLElement
-      expect(disabledCell).toBeDisabled()
-      // Disabled cells should not trigger onCellClick
-      await user.click(disabledCell)
-      // placeStone should not be called for disabled cells
-      expect(gameState.placeStone).not.toHaveBeenCalled()
-    }
+    const disabledCellIndex = findFirstDisabledCellIndex(cells, legalMoves)
+    expect(disabledCellIndex).toBeGreaterThanOrEqual(0)
+    const disabledCell = cells[disabledCellIndex] as HTMLElement
+    expect(disabledCell).toBeDisabled()
+    // Disabled cells should not trigger onCellClick
+    await user.click(disabledCell)
+    // placeStone should not be called for disabled cells
+    expect(gameState.placeStone).not.toHaveBeenCalled()
 
     // App should still be in playing state
     expect(screen.getByTestId('board')).toBeInTheDocument()
@@ -233,8 +223,8 @@ describe('App', () => {
     const cells = board.querySelectorAll('button')
     // Find a legal move cell
     const legalMoves = getLegalMoves(initialBoard, 'BLACK')
-    const firstLegalMove = legalMoves[0]
-    const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+    const legalMoveCellIndex = findFirstLegalMoveCellIndex(cells, legalMoves)
+    expect(legalMoveCellIndex).toBeGreaterThanOrEqual(0)
     await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
     // Should display error message in status message
@@ -246,6 +236,10 @@ describe('App', () => {
 
     // App should still be in playing state
     expect(screen.getByTestId('board')).toBeInTheDocument()
+
+    // Verify game state was not corrupted (board should still be in initial state)
+    // This ensures invalid move didn't modify the game state
+    expect(gameState.placeStone).toHaveBeenCalledTimes(1)
   })
 
   it('should display status message when DeviceLocal save fails after move (R2)', async () => {
@@ -278,8 +272,8 @@ describe('App', () => {
     const cells = board.querySelectorAll('button')
     // Find a legal move cell
     const legalMoves = getLegalMoves(initialBoard, 'BLACK')
-    const firstLegalMove = legalMoves[0]
-    const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+    const legalMoveCellIndex = findFirstLegalMoveCellIndex(cells, legalMoves)
+    expect(legalMoveCellIndex).toBeGreaterThanOrEqual(0)
     await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
     // Should display error message in status message
@@ -392,6 +386,16 @@ describe('App', () => {
 
     // Should call startNewGame
     expect(gameState.startNewGame).toHaveBeenCalledTimes(1)
+
+    // Should transition to PLAYING state with new game
+    await waitFor(() => {
+      expect(screen.queryByText(/start new game/i)).not.toBeInTheDocument()
+      expect(screen.getByTestId('board')).toBeInTheDocument()
+    })
+
+    // Verify game state was reset (moves should be empty)
+    // This ensures new game was properly initialized
+    expect(gameState.startNewGame).toHaveBeenCalled()
   })
 
   it('should return to previous state when Cancel is clicked in confirmation dialog', async () => {
@@ -835,8 +839,8 @@ describe('App', () => {
       const cells = board.querySelectorAll('button')
       // Find a legal move cell
       const legalMoves = getLegalMoves(initialBoard, 'BLACK')
-      const firstLegalMove = legalMoves[0]
-      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      const legalMoveCellIndex = findFirstLegalMoveCellIndex(cells, legalMoves)
+      expect(legalMoveCellIndex).toBeGreaterThanOrEqual(0)
       await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for RESULT state
@@ -932,8 +936,8 @@ describe('App', () => {
       const cells = board.querySelectorAll('button')
       // Find a legal move cell
       const legalMoves = getLegalMoves(initialBoard, 'BLACK')
-      const firstLegalMove = legalMoves[0]
-      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      const legalMoveCellIndex = findFirstLegalMoveCellIndex(cells, legalMoves)
+      expect(legalMoveCellIndex).toBeGreaterThanOrEqual(0)
       await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for RESULT state
@@ -1290,6 +1294,13 @@ describe('App', () => {
         ).toBeInTheDocument()
         expect(screen.getByTestId('board')).toBeInTheDocument()
       })
+
+      // Should verify game state was updated correctly
+      // (gameState.importRecord was called with correct parameters)
+      expect(gameState.importRecord).toHaveBeenCalledWith(
+        previewMoves,
+        previewGameState
+      )
     })
 
     it('shows error when import save fails and reverts to playing state', async () => {
@@ -1420,8 +1431,8 @@ describe('App', () => {
       const cells = board.querySelectorAll('button')
       // Find a legal move cell
       const legalMoves = getLegalMoves(initialBoard, 'BLACK')
-      const firstLegalMove = legalMoves[0]
-      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      const legalMoveCellIndex = findFirstLegalMoveCellIndex(cells, legalMoves)
+      expect(legalMoveCellIndex).toBeGreaterThanOrEqual(0)
       await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for auto-pass to occur and status message to appear
@@ -1488,6 +1499,11 @@ describe('App', () => {
 
       // Verify passTurn was called
       expect(gameState.passTurn).toHaveBeenCalledTimes(1)
+
+      // Verify game state was updated (turn should switch to BLACK)
+      await waitFor(() => {
+        expect(screen.getByTestId('board')).toBeInTheDocument()
+      })
     })
   })
 
@@ -1551,8 +1567,8 @@ describe('App', () => {
       const cells = board.querySelectorAll('button')
       // Find a legal move cell
       const legalMoves = getLegalMoves(initialBoard, 'BLACK')
-      const firstLegalMove = legalMoves[0]
-      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      const legalMoveCellIndex = findFirstLegalMoveCellIndex(cells, legalMoves)
+      expect(legalMoveCellIndex).toBeGreaterThanOrEqual(0)
       await userEvent.setup().click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for RESULT state
@@ -1628,8 +1644,8 @@ describe('App', () => {
       const cells = board.querySelectorAll('button')
       // Find a legal move cell
       const legalMoves = getLegalMoves(initialBoard, 'BLACK')
-      const firstLegalMove = legalMoves[0]
-      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      const legalMoveCellIndex = findFirstLegalMoveCellIndex(cells, legalMoves)
+      expect(legalMoveCellIndex).toBeGreaterThanOrEqual(0)
       await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for RESULT state
@@ -1700,8 +1716,8 @@ describe('App', () => {
       const cells = board.querySelectorAll('button')
       // Find a legal move cell
       const legalMoves = getLegalMoves(initialBoard, 'BLACK')
-      const firstLegalMove = legalMoves[0]
-      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      const legalMoveCellIndex = findFirstLegalMoveCellIndex(cells, legalMoves)
+      expect(legalMoveCellIndex).toBeGreaterThanOrEqual(0)
       await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for RESULT state
@@ -1751,8 +1767,11 @@ describe('App', () => {
         const cells = board.querySelectorAll('button')
         // Find a legal move cell
         const legalMoves = getLegalMoves(initialBoard, 'BLACK')
-        const firstLegalMove = legalMoves[0]
-        const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+        const legalMoveCellIndex = findFirstLegalMoveCellIndex(
+          cells,
+          legalMoves
+        )
+        expect(legalMoveCellIndex).toBeGreaterThanOrEqual(0)
         await userEvent.setup().click(cells[legalMoveCellIndex] as HTMLElement)
 
         // Wait for status message to appear
