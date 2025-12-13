@@ -26,10 +26,10 @@
 
 ### v0.2 (Documentation & Refinement)
 - [ ] Issue #26: [DOCS] INTERACTION_FLOW の状態遷移を実装に合わせて更新（statusMessage方針）
-- [ ] (TBD) [DOCS] USE_CASES のエラー方針を実装に合わせて更新
-- [ ] (TBD) [DOCS] REQUIREMENT の整合性確認と更新
-- [ ] (TBD) [CHORE] コード品質・テストカバレッジの改善
-- [ ] (TBD) [CHORE] パフォーマンス最適化とモバイル対応の強化
+- [ ] Issue #31: [DOCS] USE_CASES のエラー方針を実装に合わせて更新
+- [ ] Issue #32: [DOCS] REQUIREMENT の整合性確認と更新（実装反映）
+- [ ] Issue #33: [CHORE] コード品質・テストカバレッジの改善
+- [ ] Issue #34: [CHORE] パフォーマンス最適化とモバイルUX強化
 
 ### Backlog (Refactoring & Future)
 <!-- When v0.1 is fully checked, the Manager must run a meta-review (see project-admin.mdc). -->
