@@ -3,8 +3,10 @@
  *
  * R1: 8x8の盤面UIを表示し、セルタップで着手を試みる
  * Issue #25: Legal moves hint (highlight and disable non-legal cells)
+ * Issue #34: Performance optimization - memoize legalMoveSet creation
  */
 
+import { useMemo } from 'react'
 import type { GameState, Position } from '../domain/types'
 
 interface BoardProps {
@@ -31,9 +33,15 @@ export function Board({
   const isLegacyMode = legalMoves === undefined
 
   // Create a Set for O(1) lookup of legal moves
-  const legalMoveSet = isLegacyMode
-    ? new Set<string>()
-    : new Set(legalMoves.map((move: Position) => `${move.row}-${move.col}`))
+  // Memoize to avoid recreating Set on every render (performance optimization)
+  const legalMoveSet = useMemo(() => {
+    if (isLegacyMode) {
+      return new Set<string>()
+    }
+    return new Set(
+      legalMoves.map((move: Position) => `${move.row}-${move.col}`)
+    )
+  }, [isLegacyMode, legalMoves])
 
   return (
     <div className="board" data-testid="board">
