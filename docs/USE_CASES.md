@@ -46,8 +46,8 @@ UMLの Fully Dressed Use Case を簡略化し、Domain / State / Operations と
 - Operations: [OP_OPEN_APP, OP_PLACE_STONE]
 
 - ErrorCases:
-  - 不正手（合法手でないマスのタップ）: 着手せず、UIでエラー/無効操作として扱う
-  - DeviceLocalへの保存失敗: エラー表示し、継続可否を明示する（少なくともクラッシュしない）
+  - 不正手（合法手でないマスのタップ）: `statusMessage` でエラーを表示し、状態は `STATE_PLAYING` のまま維持する（着手せず、元状態へ戻る）
+  - DeviceLocalへの保存失敗: `statusMessage` でエラーを表示し、状態は `STATE_PLAYING` のまま維持する（少なくともクラッシュしない）
 
 ---
 
@@ -70,9 +70,9 @@ UMLの Fully Dressed Use Case を簡略化し、Domain / State / Operations と
 - Operations: [OP_IMPORT_RECORD_FROM_FILE, OP_IMPORT_RECORD_FROM_CLIPBOARD]
 
 - ErrorCases:
-  - JSONがパースできない/スキーマ不正: 上書きせず、エラー表示して元の対局へ戻る
-  - クリップボード権限拒否: エラー表示して元の対局へ戻る
-  - DeviceLocalへの保存失敗: エラー表示し、復元結果が永続化されない可能性を明示する
+  - JSONがパースできない/スキーマ不正: `statusMessage` でエラーを表示し、状態は `STATE_PLAYING` のまま維持する（上書きせず、元の対局へ戻る）
+  - クリップボード権限拒否: `statusMessage` でエラーを表示し、状態は `STATE_PLAYING` のまま維持する（元の対局へ戻る）
+  - DeviceLocalへの保存失敗: `statusMessage` でエラーを表示し、状態は `STATE_PLAYING` のまま維持する（復元結果が永続化されない可能性を明示する）
 
 ---
 
@@ -97,8 +97,8 @@ UMLの Fully Dressed Use Case を簡略化し、Domain / State / Operations と
 - Operations: [OP_EXPORT_RECORD_TO_FILE, OP_EXPORT_RECORD_TO_CLIPBOARD]
 
 - ErrorCases:
-  - クリップボード権限拒否: エラー表示し、ファイル出力など代替手段を案内する
-  - ダウンロード失敗: エラー表示し、再試行可能にする
+  - クリップボード権限拒否: `statusMessage` でエラーを表示し、元の状態（`STATE_PLAYING` または `STATE_RESULT`）へ戻る（ファイル出力など代替手段を案内する）
+  - ダウンロード失敗: `statusMessage` でエラーを表示し、元の状態（`STATE_PLAYING` または `STATE_RESULT`）へ戻る（再試行可能にする）
 
 ---
 
@@ -122,7 +122,7 @@ UMLの Fully Dressed Use Case を簡略化し、Domain / State / Operations と
 - Operations: [OP_START_NEW_GAME]
 
 - ErrorCases:
-  - DeviceLocalへの保存失敗: エラー表示し、復元できない可能性を明示する
+  - DeviceLocalへの保存失敗: `statusMessage` でエラーを表示し、状態は `STATE_NEW_GAME_CONFIRM` のまま維持する（復元できない可能性を明示する）
 
 <!--
 Record Format (Draft, custom JSON):
