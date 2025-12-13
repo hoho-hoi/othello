@@ -8,15 +8,17 @@ import userEvent from '@testing-library/user-event'
 import { Board } from './Board'
 import { createInitialBoard, getLegalMoves } from '../domain/rules'
 import type { GameState, Position } from '../domain/types'
+import {
+  getCellIndex,
+  getRowColFromIndex,
+  createLegalMoveSet,
+  findFirstDisabledCellIndex,
+  createTestGameState,
+} from '../test/helpers'
 
 describe('Board', () => {
   it('should render 8x8 board', () => {
-    const gameState: GameState = {
-      board: createInitialBoard(),
-      nextTurnColor: 'BLACK',
-      isFinished: false,
-    }
-
+    const gameState = createTestGameState()
     const onCellClick = vi.fn()
 
     render(<Board gameState={gameState} onCellClick={onCellClick} />)
@@ -28,12 +30,7 @@ describe('Board', () => {
 
   it('should call onCellClick when cell is clicked', async () => {
     const user = userEvent.setup()
-    const gameState: GameState = {
-      board: createInitialBoard(),
-      nextTurnColor: 'BLACK',
-      isFinished: false,
-    }
-
+    const gameState = createTestGameState()
     const onCellClick = vi.fn()
 
     render(<Board gameState={gameState} onCellClick={onCellClick} />)
@@ -46,12 +43,7 @@ describe('Board', () => {
   })
 
   it('should display pieces correctly', () => {
-    const gameState: GameState = {
-      board: createInitialBoard(),
-      nextTurnColor: 'BLACK',
-      isFinished: false,
-    }
-
+    const gameState = createTestGameState()
     const onCellClick = vi.fn()
 
     render(<Board gameState={gameState} onCellClick={onCellClick} />)
@@ -93,22 +85,14 @@ describe('Board', () => {
         // Set a specific cell to BLACK
         board[3][4] = 'BLACK'
 
-        const gameState: GameState = {
-          board,
-          nextTurnColor: 'BLACK',
-          isFinished: false,
-        }
-
+        const gameState = createTestGameState({ board })
         const onCellClick = vi.fn()
 
         render(<Board gameState={gameState} onCellClick={onCellClick} />)
 
-        // Find the cell at (3, 4) - it's the 4th row, 5th column (0-indexed)
-        // Row 3 = 4th row, Col 4 = 5th column
-        // Total cells before row 3: 3 * 8 = 24
-        // Plus column 4: 24 + 4 = 28th cell (0-indexed)
+        // Find the cell at (3, 4)
         const cells = screen.getAllByRole('button')
-        const targetCell = cells[3 * 8 + 4]
+        const targetCell = cells[getCellIndex(3, 4)]
 
         const ariaLabel = targetCell.getAttribute('aria-label')
         expect(ariaLabel).toBeTruthy()
@@ -121,19 +105,14 @@ describe('Board', () => {
         // Set a specific cell to WHITE
         board[3][3] = 'WHITE'
 
-        const gameState: GameState = {
-          board,
-          nextTurnColor: 'BLACK',
-          isFinished: false,
-        }
-
+        const gameState = createTestGameState({ board })
         const onCellClick = vi.fn()
 
         render(<Board gameState={gameState} onCellClick={onCellClick} />)
 
         // Find the cell at (3, 3)
         const cells = screen.getAllByRole('button')
-        const targetCell = cells[3 * 8 + 3]
+        const targetCell = cells[getCellIndex(3, 3)]
 
         const ariaLabel = targetCell.getAttribute('aria-label')
         expect(ariaLabel).toBeTruthy()
@@ -145,12 +124,7 @@ describe('Board', () => {
     describe('R3: Keyboard navigation', () => {
       it('should allow Tab navigation between cells', async () => {
         const user = userEvent.setup()
-        const gameState: GameState = {
-          board: createInitialBoard(),
-          nextTurnColor: 'BLACK',
-          isFinished: false,
-        }
-
+        const gameState = createTestGameState()
         const onCellClick = vi.fn()
 
         render(<Board gameState={gameState} onCellClick={onCellClick} />)
@@ -169,12 +143,7 @@ describe('Board', () => {
 
       it('should trigger cell click on Enter key', async () => {
         const user = userEvent.setup()
-        const gameState: GameState = {
-          board: createInitialBoard(),
-          nextTurnColor: 'BLACK',
-          isFinished: false,
-        }
-
+        const gameState = createTestGameState()
         const onCellClick = vi.fn()
 
         render(<Board gameState={gameState} onCellClick={onCellClick} />)
@@ -192,12 +161,7 @@ describe('Board', () => {
 
       it('should trigger cell click on Space key', async () => {
         const user = userEvent.setup()
-        const gameState: GameState = {
-          board: createInitialBoard(),
-          nextTurnColor: 'BLACK',
-          isFinished: false,
-        }
-
+        const gameState = createTestGameState()
         const onCellClick = vi.fn()
 
         render(<Board gameState={gameState} onCellClick={onCellClick} />)
@@ -218,12 +182,7 @@ describe('Board', () => {
   describe('Legal moves hint (Issue #25)', () => {
     describe('R1: Legal moves are highlighted visually', () => {
       it('should apply highlight class to legal move cells', () => {
-        const gameState: GameState = {
-          board: createInitialBoard(),
-          nextTurnColor: 'BLACK',
-          isFinished: false,
-        }
-
+        const gameState = createTestGameState()
         const legalMoves = getLegalMoves(
           gameState.board,
           gameState.nextTurnColor
@@ -241,19 +200,14 @@ describe('Board', () => {
         // Check that legal move cells have the highlight class
         const cells = screen.getAllByRole('button')
         legalMoves.forEach((move: Position) => {
-          const cellIndex = move.row * 8 + move.col
+          const cellIndex = getCellIndex(move.row, move.col)
           const cell = cells[cellIndex]
           expect(cell).toHaveClass('board-cell-legal')
         })
       })
 
       it('should not apply highlight class to non-legal move cells', () => {
-        const gameState: GameState = {
-          board: createInitialBoard(),
-          nextTurnColor: 'BLACK',
-          isFinished: false,
-        }
-
+        const gameState = createTestGameState()
         const legalMoves = getLegalMoves(
           gameState.board,
           gameState.nextTurnColor
@@ -270,13 +224,10 @@ describe('Board', () => {
 
         // Check that non-legal move cells do not have the highlight class
         const cells = screen.getAllByRole('button')
-        const legalMoveSet = new Set(
-          legalMoves.map((move: Position) => `${move.row}-${move.col}`)
-        )
+        const legalMoveSet = createLegalMoveSet(legalMoves)
 
         cells.forEach((cell, index) => {
-          const row = Math.floor(index / 8)
-          const col = index % 8
+          const { row, col } = getRowColFromIndex(index)
           const cellKey = `${row}-${col}`
 
           if (!legalMoveSet.has(cellKey)) {
@@ -288,12 +239,7 @@ describe('Board', () => {
 
     describe('R2: Non-legal move cells are disabled', () => {
       it('should disable non-legal move cells', () => {
-        const gameState: GameState = {
-          board: createInitialBoard(),
-          nextTurnColor: 'BLACK',
-          isFinished: false,
-        }
-
+        const gameState = createTestGameState()
         const legalMoves = getLegalMoves(
           gameState.board,
           gameState.nextTurnColor
@@ -310,13 +256,10 @@ describe('Board', () => {
 
         // Check that non-legal move cells are disabled
         const cells = screen.getAllByRole('button')
-        const legalMoveSet = new Set(
-          legalMoves.map((move: Position) => `${move.row}-${move.col}`)
-        )
+        const legalMoveSet = createLegalMoveSet(legalMoves)
 
         cells.forEach((cell, index) => {
-          const row = Math.floor(index / 8)
-          const col = index % 8
+          const { row, col } = getRowColFromIndex(index)
           const cellKey = `${row}-${col}`
 
           if (!legalMoveSet.has(cellKey)) {
@@ -329,12 +272,7 @@ describe('Board', () => {
 
       it('should not call onCellClick when disabled cell is clicked', async () => {
         const user = userEvent.setup()
-        const gameState: GameState = {
-          board: createInitialBoard(),
-          nextTurnColor: 'BLACK',
-          isFinished: false,
-        }
-
+        const gameState = createTestGameState()
         const legalMoves = getLegalMoves(
           gameState.board,
           gameState.nextTurnColor
@@ -351,41 +289,22 @@ describe('Board', () => {
 
         // Find a disabled cell (non-legal move)
         const cells = screen.getAllByRole('button')
-        const legalMoveSet = new Set(
-          legalMoves.map((move: Position) => `${move.row}-${move.col}`)
-        )
+        const disabledCellIndex = findFirstDisabledCellIndex(cells, legalMoves)
 
-        let disabledCellIndex = -1
-        for (let i = 0; i < cells.length; i++) {
-          const row = Math.floor(i / 8)
-          const col = i % 8
-          const cellKey = `${row}-${col}`
-          if (!legalMoveSet.has(cellKey)) {
-            disabledCellIndex = i
-            break
-          }
-        }
+        expect(disabledCellIndex).toBeGreaterThanOrEqual(0)
+        const disabledCell = cells[disabledCellIndex]
+        expect(disabledCell).toBeDisabled()
 
-        if (disabledCellIndex >= 0) {
-          const disabledCell = cells[disabledCellIndex]
-          expect(disabledCell).toBeDisabled()
+        // Try to click disabled cell
+        await user.click(disabledCell)
 
-          // Try to click disabled cell
-          await user.click(disabledCell)
-
-          // onCellClick should not be called for disabled cells
-          expect(onCellClick).not.toHaveBeenCalled()
-        }
+        // onCellClick should not be called for disabled cells
+        expect(onCellClick).not.toHaveBeenCalled()
       })
 
       it('should disable all cells when legalMoves is empty array', async () => {
         const user = userEvent.setup()
-        const gameState: GameState = {
-          board: createInitialBoard(),
-          nextTurnColor: 'BLACK',
-          isFinished: false,
-        }
-
+        const gameState = createTestGameState()
         const legalMoves: Position[] = []
         const onCellClick = vi.fn()
 
@@ -433,13 +352,10 @@ describe('Board', () => {
 
         // Check initial legal moves for BLACK
         const cellsBlack = screen.getAllByRole('button')
-        const legalMoveSetBlack = new Set(
-          legalMovesBlack.map((move: Position) => `${move.row}-${move.col}`)
-        )
+        const legalMoveSetBlack = createLegalMoveSet(legalMovesBlack)
 
         cellsBlack.forEach((cell, index) => {
-          const row = Math.floor(index / 8)
-          const col = index % 8
+          const { row, col } = getRowColFromIndex(index)
           const cellKey = `${row}-${col}`
 
           if (legalMoveSetBlack.has(cellKey)) {
@@ -470,13 +386,10 @@ describe('Board', () => {
 
         // Check updated legal moves for WHITE
         const cellsWhite = screen.getAllByRole('button')
-        const legalMoveSetWhite = new Set(
-          legalMovesWhite.map((move: Position) => `${move.row}-${move.col}`)
-        )
+        const legalMoveSetWhite = createLegalMoveSet(legalMovesWhite)
 
         cellsWhite.forEach((cell, index) => {
-          const row = Math.floor(index / 8)
-          const col = index % 8
+          const { row, col } = getRowColFromIndex(index)
           const cellKey = `${row}-${col}`
 
           if (legalMoveSetWhite.has(cellKey)) {
@@ -490,12 +403,9 @@ describe('Board', () => {
 
         // Legal moves should be different between BLACK and WHITE
         // (They may have the same count, but the positions should differ)
-        const legalMoveSetWhiteStr = new Set(
-          legalMovesWhite.map((move: Position) => `${move.row}-${move.col}`)
-        )
         // Check that at least one legal move position differs
         const allSame = legalMovesBlack.every((move: Position) =>
-          legalMoveSetWhiteStr.has(`${move.row}-${move.col}`)
+          legalMoveSetWhite.has(`${move.row}-${move.col}`)
         )
         expect(allSame).toBe(false)
       })
