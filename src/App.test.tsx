@@ -1655,4 +1655,158 @@ describe('App', () => {
       expect(screen.getByText(/Record/i)).toBeInTheDocument()
     })
   })
+
+  describe('Accessibility (Issue #24)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+    })
+
+    describe('R1: statusMessage aria-live', () => {
+      it('should have aria-live="polite" on status message element', async () => {
+        const initialBoard = createInitialBoard()
+        vi.mocked(gameState.initializeGame).mockResolvedValue({
+          success: true,
+          gameState: {
+            board: initialBoard,
+            nextTurnColor: 'BLACK',
+            isFinished: false,
+          },
+          moves: [],
+        })
+
+        // Mock placeStone to return error (illegal move)
+        vi.mocked(gameState.placeStone).mockResolvedValue({
+          success: false,
+          error: 'Illegal move: no pieces can be flipped',
+        })
+
+        render(<App />)
+
+        await waitFor(() => {
+          expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+        })
+
+        // Click on a cell to trigger status message
+        const board = screen.getByTestId('board')
+        const cells = board.querySelectorAll('button')
+        await userEvent.setup().click(cells[0] as HTMLElement)
+
+        // Wait for status message to appear
+        await waitFor(() => {
+          const statusMessage = screen.getByText(
+            /Illegal move: no pieces can be flipped/i
+          )
+          expect(statusMessage).toBeInTheDocument()
+          expect(statusMessage).toHaveAttribute('role', 'status')
+          expect(statusMessage).toHaveAttribute('aria-live', 'polite')
+        })
+      })
+    })
+
+    describe('R4: Button accessibility labels', () => {
+      it('should have accessible labels for New Game button', async () => {
+        const initialBoard = createInitialBoard()
+        vi.mocked(gameState.initializeGame).mockResolvedValue({
+          success: true,
+          gameState: {
+            board: initialBoard,
+            nextTurnColor: 'BLACK',
+            isFinished: false,
+          },
+          moves: [],
+        })
+
+        render(<App />)
+
+        await waitFor(() => {
+          expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+        })
+
+        // New Game button should have accessible text or aria-label
+        const newGameButton = screen.getByRole('button', { name: /new game/i })
+        expect(newGameButton).toBeInTheDocument()
+        // Button text should be clear
+        expect(newGameButton.textContent).toMatch(/new game/i)
+      })
+
+      it('should have accessible labels for Export button', async () => {
+        const initialBoard = createInitialBoard()
+        vi.mocked(gameState.initializeGame).mockResolvedValue({
+          success: true,
+          gameState: {
+            board: initialBoard,
+            nextTurnColor: 'BLACK',
+            isFinished: false,
+          },
+          moves: [],
+        })
+
+        render(<App />)
+
+        await waitFor(() => {
+          expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+        })
+
+        // Export button should have accessible text or aria-label
+        const exportButton = screen.getByRole('button', { name: /export/i })
+        expect(exportButton).toBeInTheDocument()
+        // Button text should be clear
+        expect(exportButton.textContent).toMatch(/export/i)
+      })
+
+      it('should have accessible labels for Import (Clipboard) button', async () => {
+        const initialBoard = createInitialBoard()
+        vi.mocked(gameState.initializeGame).mockResolvedValue({
+          success: true,
+          gameState: {
+            board: initialBoard,
+            nextTurnColor: 'BLACK',
+            isFinished: false,
+          },
+          moves: [],
+        })
+
+        render(<App />)
+
+        await waitFor(() => {
+          expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+        })
+
+        // Import (Clipboard) button should have accessible text or aria-label
+        const importButton = screen.getByRole('button', {
+          name: /import.*clipboard/i,
+        })
+        expect(importButton).toBeInTheDocument()
+        // Button text should be clear
+        expect(importButton.textContent).toMatch(/import.*clipboard/i)
+      })
+
+      it('should have accessible labels for Import (File) button', async () => {
+        const initialBoard = createInitialBoard()
+        vi.mocked(gameState.initializeGame).mockResolvedValue({
+          success: true,
+          gameState: {
+            board: initialBoard,
+            nextTurnColor: 'BLACK',
+            isFinished: false,
+          },
+          moves: [],
+        })
+
+        render(<App />)
+
+        await waitFor(() => {
+          expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+        })
+
+        // Import (File) button should have accessible text or aria-label
+        const importButton = screen.getByRole('button', {
+          name: /import.*file/i,
+        })
+        expect(importButton).toBeInTheDocument()
+        // Button text should be clear
+        expect(importButton.textContent).toMatch(/import.*file/i)
+      })
+    })
+  })
 })
