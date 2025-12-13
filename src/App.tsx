@@ -28,7 +28,7 @@ function App() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const statusMessageElement = statusMessage ? (
-    <p className="status-message" role="status">
+    <p className="status-message" role="status" aria-live="polite">
       {statusMessage}
     </p>
   ) : null
