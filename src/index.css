@@ -77,6 +77,21 @@ body {
   background-color: #4a7b2f;
 }
 
+/* Issue #25: Legal moves hint */
+.board-cell-legal {
+  background-color: #4a7b2f;
+  box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.board-cell-legal:hover {
+  background-color: #5a8b3f;
+}
+
+.board-cell:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* Record sidebar styles */
 .record-sidebar {
   min-width: 200px;

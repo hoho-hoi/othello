@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import App from './App'
 import * as gameState from './app/gameState'
 import * as rules from './domain/rules'
-import { createInitialBoard } from './domain/rules'
+import { createInitialBoard, getLegalMoves } from './domain/rules'
 
 vi.mock('./app/gameState')
 vi.mock('./domain/rules', async () => {
@@ -132,7 +132,11 @@ describe('App', () => {
     // Get board cells specifically (not New Game button)
     const board = screen.getByTestId('board')
     const cells = board.querySelectorAll('button')
-    await user.click(cells[0] as HTMLElement)
+    // Find a legal move cell (initial board: BLACK can play at (2,3), (3,2), (4,5), (5,4))
+    const legalMoves = getLegalMoves(initialBoard, 'BLACK')
+    const firstLegalMove = legalMoves[0]
+    const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+    await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
     // placeStone should be called
     expect(gameState.placeStone).toHaveBeenCalledTimes(1)
@@ -165,12 +169,35 @@ describe('App', () => {
 
     // Click on a cell (illegal move position)
     // Get board cells specifically (not New Game button)
+    // Note: With Issue #25, illegal move cells are disabled, so clicking them won't trigger onCellClick
+    // This test now verifies that disabled cells don't trigger clicks
     const board = screen.getByTestId('board')
     const cells = board.querySelectorAll('button')
-    await user.click(cells[0] as HTMLElement)
+    // Find a disabled cell (non-legal move)
+    const legalMoves = getLegalMoves(initialBoard, 'BLACK')
+    const legalMoveSet = new Set(
+      legalMoves.map((move) => `${move.row}-${move.col}`)
+    )
+    // Find first disabled cell
+    let disabledCellIndex = -1
+    for (let i = 0; i < cells.length; i++) {
+      const row = Math.floor(i / 8)
+      const col = i % 8
+      const cellKey = `${row}-${col}`
+      if (!legalMoveSet.has(cellKey)) {
+        disabledCellIndex = i
+        break
+      }
+    }
+    if (disabledCellIndex >= 0) {
+      const disabledCell = cells[disabledCellIndex] as HTMLElement
+      expect(disabledCell).toBeDisabled()
+      // Disabled cells should not trigger onCellClick
+      await user.click(disabledCell)
+      // placeStone should not be called for disabled cells
+      expect(gameState.placeStone).not.toHaveBeenCalled()
+    }
 
-    // placeStone should be called, but app should not crash
-    expect(gameState.placeStone).toHaveBeenCalledTimes(1)
     // App should still be in playing state
     expect(screen.getByTestId('board')).toBeInTheDocument()
   })
@@ -200,10 +227,15 @@ describe('App', () => {
       expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
     })
 
-    // Click on a cell (illegal move position)
+    // Click on a legal move cell, but placeStone will return error
+    // (This simulates a case where the move becomes invalid between UI click and backend validation)
     const board = screen.getByTestId('board')
     const cells = board.querySelectorAll('button')
-    await user.click(cells[0] as HTMLElement)
+    // Find a legal move cell
+    const legalMoves = getLegalMoves(initialBoard, 'BLACK')
+    const firstLegalMove = legalMoves[0]
+    const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+    await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
     // Should display error message in status message
     await waitFor(() => {
@@ -244,7 +276,11 @@ describe('App', () => {
     // Click on a cell (legal move position)
     const board = screen.getByTestId('board')
     const cells = board.querySelectorAll('button')
-    await user.click(cells[0] as HTMLElement)
+    // Find a legal move cell
+    const legalMoves = getLegalMoves(initialBoard, 'BLACK')
+    const firstLegalMove = legalMoves[0]
+    const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+    await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
     // Should display error message in status message
     await waitFor(() => {
@@ -797,7 +833,11 @@ describe('App', () => {
       // Make a move to transition to RESULT state
       const board = screen.getByTestId('board')
       const cells = board.querySelectorAll('button')
-      await user.click(cells[0] as HTMLElement)
+      // Find a legal move cell
+      const legalMoves = getLegalMoves(initialBoard, 'BLACK')
+      const firstLegalMove = legalMoves[0]
+      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for RESULT state
       await waitFor(() => {
@@ -890,7 +930,11 @@ describe('App', () => {
       // Make a move to transition to RESULT state
       const board = screen.getByTestId('board')
       const cells = board.querySelectorAll('button')
-      await user.click(cells[0] as HTMLElement)
+      // Find a legal move cell
+      const legalMoves = getLegalMoves(initialBoard, 'BLACK')
+      const firstLegalMove = legalMoves[0]
+      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for RESULT state
       await waitFor(() => {
@@ -1374,7 +1418,11 @@ describe('App', () => {
       // Click on a cell to place a stone
       const board = screen.getByTestId('board')
       const cells = board.querySelectorAll('button')
-      await user.click(cells[0] as HTMLElement)
+      // Find a legal move cell
+      const legalMoves = getLegalMoves(initialBoard, 'BLACK')
+      const firstLegalMove = legalMoves[0]
+      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for auto-pass to occur and status message to appear
       await waitFor(
@@ -1501,7 +1549,11 @@ describe('App', () => {
       // Make a move to finish the game
       const board = screen.getByTestId('board')
       const cells = board.querySelectorAll('button')
-      await userEvent.setup().click(cells[0] as HTMLElement)
+      // Find a legal move cell
+      const legalMoves = getLegalMoves(initialBoard, 'BLACK')
+      const firstLegalMove = legalMoves[0]
+      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      await userEvent.setup().click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for RESULT state
       await waitFor(() => {
@@ -1574,7 +1626,11 @@ describe('App', () => {
       // Make a move to finish the game
       const board = screen.getByTestId('board')
       const cells = board.querySelectorAll('button')
-      await user.click(cells[0] as HTMLElement)
+      // Find a legal move cell
+      const legalMoves = getLegalMoves(initialBoard, 'BLACK')
+      const firstLegalMove = legalMoves[0]
+      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for RESULT state
       await waitFor(() => {
@@ -1642,7 +1698,11 @@ describe('App', () => {
       // Make a move to finish the game
       const board = screen.getByTestId('board')
       const cells = board.querySelectorAll('button')
-      await user.click(cells[0] as HTMLElement)
+      // Find a legal move cell
+      const legalMoves = getLegalMoves(initialBoard, 'BLACK')
+      const firstLegalMove = legalMoves[0]
+      const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+      await user.click(cells[legalMoveCellIndex] as HTMLElement)
 
       // Wait for RESULT state
       await waitFor(() => {
@@ -1689,7 +1749,11 @@ describe('App', () => {
         // Click on a cell to trigger status message
         const board = screen.getByTestId('board')
         const cells = board.querySelectorAll('button')
-        await userEvent.setup().click(cells[0] as HTMLElement)
+        // Find a legal move cell
+        const legalMoves = getLegalMoves(initialBoard, 'BLACK')
+        const firstLegalMove = legalMoves[0]
+        const legalMoveCellIndex = firstLegalMove.row * 8 + firstLegalMove.col
+        await userEvent.setup().click(cells[legalMoveCellIndex] as HTMLElement)
 
         // Wait for status message to appear
         await waitFor(() => {
