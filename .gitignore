@@ -27,4 +27,4 @@ coverage/
 *.lcov
 
 # Vite
-.vite/
+.vite/pr_body_*.md

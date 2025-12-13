@@ -6,7 +6,7 @@
  * R3: Save/Load失敗時はクラッシュせず、STATE_ERRORへ遷移できる
  */
 
-import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, useMemo, type ChangeEvent } from 'react'
 import {
   initializeGame,
   placeStone,
@@ -19,7 +19,7 @@ import {
   importRecord,
   type AppState,
 } from './app/gameState'
-import { canPass, computeGameResult } from './domain/rules'
+import { canPass, computeGameResult, getLegalMoves } from './domain/rules'
 import { Board } from './components/Board'
 import { RecordSidebar } from './components/RecordSidebar'
 
@@ -32,6 +32,24 @@ function App() {
       {statusMessage}
     </p>
   ) : null
+
+  // Issue #25 R1, R4: Calculate legal moves for current turn with memoization
+  // Memoize to avoid recalculating on every render (performance optimization)
+  // Only calculate when in PLAYING state
+  const isPlaying = appState.type === 'PLAYING'
+  const gameBoard = isPlaying ? appState.gameState.board : null
+  const nextTurnColor = isPlaying ? appState.gameState.nextTurnColor : null
+  const isFinished = isPlaying ? appState.gameState.isFinished : null
+
+  const legalMoves = useMemo(() => {
+    if (!isPlaying || isFinished) {
+      return []
+    }
+    if (gameBoard === null || nextTurnColor === null) {
+      return []
+    }
+    return getLegalMoves(gameBoard, nextTurnColor)
+  }, [isPlaying, gameBoard, nextTurnColor, isFinished])
 
   useEffect(() => {
     // R1: Initialize game on app launch
@@ -335,6 +353,7 @@ function App() {
             <Board
               gameState={appState.gameState}
               onCellClick={handleCellClick}
+              legalMoves={legalMoves}
             />
           </div>
           <RecordSidebar moves={appState.moves} />
